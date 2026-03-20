@@ -6,8 +6,8 @@
     <title>자율학습 저녁 식사 통계</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- 엑셀 파일 처리를 위한 SheetJS 라이브러리 추가 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- 엑셀 파일 처리 및 스타일링을 위한 xlsx-js-style 라이브러리로 교체 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <!-- PDF 파일 처리를 위한 PDF.js 라이브러리 추가 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script>
@@ -134,6 +134,21 @@
                 return `${month}월 ${day}일`;
             }
             return dateStr; // 이미 "03월 02일" 형태라면 그대로 반환
+        }
+
+        // 엑셀 내보내기용 날짜 포맷터 함수 추가 ("04월 01일" -> "4/1")
+        function formatExcelDate(dateStr) {
+            if (!dateStr) return "";
+            if (dateStr.includes('월')) {
+                const month = parseInt(dateStr.split('월')[0].replace(/[^0-9]/g, ''), 10);
+                const day = parseInt(dateStr.split('월')[1].replace(/[^0-9]/g, ''), 10);
+                return `${month}/${day}`;
+            }
+            if (dateStr.includes('/')) {
+                const parts = dateStr.split('/');
+                return `${parseInt(parts[0], 10)}/${parseInt(parts[1], 10)}`;
+            }
+            return dateStr;
         }
 
         // 브라우저 팝업 대신 예쁜 토스트 알림을 띄우는 함수
@@ -455,13 +470,20 @@
             }
             const fileName = `${monthPrefix}자율학습_저녁식사_통계`;
 
-            // 1. 전체 일자 추출 및 변환 (만약 "4/1"형식이면 "04월 01일"로, 이미 "03월 02일"형식이면 원본 유지)
+            // 1. 전체 일자 추출 및 엑셀용 포맷("4/1") 변환
             const allDates = rawSchedule.map(day => day.date);
-            const formattedDates = allDates.map(dateStr => formatDisplayDate(dateStr));
+            const excelDates = allDates.map(dateStr => formatExcelDate(dateStr));
 
-            // 2. 엑셀 데이터 배열 준비 (첫 줄: 헤더)
+            // 2. 엑셀 데이터 배열 준비
             const excelData = [];
-            const headerRow = ["선생님 성함", ...formattedDates, "합계"];
+            
+            // [1행] 제목행 설정 (병합용)
+            const titleRow = new Array(excelDates.length + 2).fill("");
+            titleRow[0] = fileName; // 병합 시작 기준점에 제목 삽입
+            excelData.push(titleRow);
+
+            // [2행] 헤더
+            const headerRow = ["선생님 성함", ...excelDates, "합계"];
             excelData.push(headerRow);
 
             // 현재 식사 횟수 재계산 (정렬 및 계산용)
@@ -479,7 +501,7 @@
             // 식사 횟수 기준 내림차순 정렬
             const sortedTeachers = uniqueTeachers.sort((a, b) => stats[b] - stats[a]);
 
-            // 3. 각 선생님별 행 데이터 생성
+            // [3행~] 각 선생님별 행 데이터 생성
             sortedTeachers.forEach(teacher => {
                 const row = [teacher]; // 첫 번째 열: 선생님 성함
                 let total = 0;
@@ -499,15 +521,88 @@
                 excelData.push(row);
             });
 
-            // SheetJS를 사용하여 워크북 생성 후 파일 다운로드
+            // 워크시트 변환
             const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+            // ----------------------------------------------------------------
+            // 스타일 및 인쇄 레이아웃 상세 설정 (xlsx-js-style 라이브러리 활용)
+            // ----------------------------------------------------------------
+
+            // (가) 제목줄 병합 처리 (1행 1열부터 헤더의 끝 열까지)
+            ws['!merges'] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: headerRow.length - 1 } }
+            ];
+
+            // (나) 각 열의 너비 지정 (선생님성함: 12, 날짜칸: 5, 합계칸: 8)
+            const colWidths = [{ wch: 12 }]; 
+            excelDates.forEach(() => colWidths.push({ wch: 5 })); 
+            colWidths.push({ wch: 8 }); 
+            ws['!cols'] = colWidths;
+
+            // (다) 각 행의 높이 지정 (제목: 40, 헤더: 25, 내용: 22)
+            const rowHeights = [{ hpt: 40 }, { hpt: 25 }]; 
+            sortedTeachers.forEach(() => rowHeights.push({ hpt: 22 })); 
+            ws['!rows'] = rowHeights;
+
+            // (라) 한 페이지에 인쇄되도록 용지 설정 (Fit to Page & 가로 모드)
+            ws['!pageSetup'] = { 
+                fitToPage: true, 
+                fitToWidth: 1, 
+                fitToHeight: 1, 
+                orientation: 'landscape' 
+            };
+
+            // (마) 셀 단위 테두리, 정렬, 폰트 디자인 적용
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+                    
+                    // 빈 셀(식사를 안해서 O 표시가 없는 곳)도 스타일을 입히기 위해 객체 생성
+                    if (!ws[cellRef]) {
+                        ws[cellRef] = { t: 's', v: '' };
+                    }
+
+                    // 검은색 얇은 외곽선(테두리) 명시적 설정
+                    const borderStyle = {
+                        top: { style: 'thin', color: { rgb: "000000" } },
+                        bottom: { style: 'thin', color: { rgb: "000000" } },
+                        left: { style: 'thin', color: { rgb: "000000" } },
+                        right: { style: 'thin', color: { rgb: "000000" } }
+                    };
+
+                    if (R === 0) {
+                        // 제목(1행) 스타일: 크게, 가운데 정렬, 테두리 완전 제거
+                        ws[cellRef].s = {
+                            font: { sz: 16, bold: true },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    } else if (R === 1) {
+                        // 헤더(2행) 스타일: 굵게, 회색배경, 모든 테두리 적용
+                        ws[cellRef].s = {
+                            font: { bold: true, color: { rgb: "333333" } },
+                            fill: { fgColor: { rgb: "F3F4F6" } },
+                            alignment: { horizontal: "center", vertical: "center" },
+                            border: borderStyle
+                        };
+                    } else {
+                        // 데이터(3행~) 스타일: 가운데 정렬, 모든 테두리 적용
+                        ws[cellRef].s = {
+                            alignment: { horizontal: "center", vertical: "center" },
+                            border: borderStyle
+                        };
+                    }
+                }
+            }
+
             const wb = XLSX.utils.book_new();
             
             // 엑셀 시트 제목을 파일명과 동일하게 설정 (엑셀 시트 이름 제한인 31자를 넘지 않게 잘라줌)
             XLSX.utils.book_append_sheet(wb, ws, fileName.substring(0, 31));
 
             XLSX.writeFile(wb, `${fileName}.xlsx`);
-            showToast("엑셀 파일이 다운로드 되었습니다.");
+            showToast("엑셀 파일이 성공적으로 디자인되어 다운로드 되었습니다.");
         }
 
         // 실행
