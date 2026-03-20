@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4월 자율학습 저녁 식사 통계</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- 엑셀 파일 처리를 위한 SheetJS 라이브러리 추가 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- PDF 파일 처리를 위한 PDF.js 라이브러리 추가 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+</head>
+<body class="bg-gray-50 p-4 md:p-8 font-sans">
+
+    <!-- Toast 알림창 (추가됨) -->
+    <div id="toast" class="fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded shadow-lg transform -translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center pointer-events-none">
+        <i class="fas fa-info-circle mr-2"></i>
+        <span id="toastMessage">메시지</span>
+    </div>
+
+    <div class="max-w-5xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-utensils text-blue-500 mr-2"></i>배정고 1학년 자율학습 식사 체크</h1>
+                <p class="text-gray-500 mt-1">당번 선생님 저녁 식사 여부 및 통계 대시보드</p>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+                <div class="relative group">
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .pdf" class="hidden" onchange="handleFileUpload(event)">
+                    <label for="fileInput" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition duration-200 text-sm font-medium border border-blue-200 cursor-pointer inline-flex items-center shadow-sm">
+                        <i class="fas fa-file-upload mr-1"></i> 명단 업로드
+                    </label>
+                    <!-- 업로드 안내 툴팁 -->
+                    <div class="absolute right-0 top-full mt-2 w-72 bg-gray-800 text-white text-xs rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                        A열: 날짜, B열부터: 감독교사를 적은 엑셀이나 PDF 파일을 올려주세요.
+                    </div>
+                </div>
+                <button onclick="resetData()" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition duration-200 text-sm font-medium border border-red-200 shadow-sm">
+                    <i class="fas fa-rotate-right mr-1"></i> 데이터 초기화
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Column: Schedule & Checklist -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-gray-700">📅 4월 체크리스트</h2>
+                    <span class="text-xs text-gray-500 bg-white px-2 py-1 rounded border">클릭하여 체크하세요</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 text-sm border-b border-gray-100">
+                                <th class="p-4 font-semibold w-24">일자</th>
+                                <th class="p-4 font-semibold">감독 교사 1</th>
+                                <th class="p-4 font-semibold">감독 교사 2</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleTable" class="divide-y divide-gray-100">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right Column: Statistics -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-fit">
+                <div class="p-5 border-b border-gray-100 bg-blue-50 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-blue-800">📊 월간 식사 통계</h2>
+                    <!-- 엑셀 다운로드 버튼 (추가됨) -->
+                    <button onclick="downloadExcel()" class="px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-200 text-xs font-medium shadow-sm flex items-center">
+                        <i class="fas fa-file-excel mr-1"></i> 엑셀 저장
+                    </button>
+                </div>
+                <div class="p-0">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-gray-500 text-sm border-b border-gray-100 bg-gray-50">
+                                <th class="p-4 font-medium">선생님 성함</th>
+                                <th class="p-4 font-medium text-center">식사 횟수</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsTable" class="divide-y divide-gray-100">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // PDF에서 추출한 4월 당번 데이터 (업데이트 가능하도록 let으로 변경)
+        let rawSchedule = [
+            { date: "4/1", teachers: ["유지연", "노우선"] },
+            { date: "4/2", teachers: ["류제원", "이동규"] },
+            { date: "4/6", teachers: ["김지수", "이광욱"] },
+            { date: "4/7", teachers: ["유지연", "추재훈"] },
+            { date: "4/8", teachers: ["류제원", "옥수민"] },
+            { date: "4/9", teachers: ["김현정", "이동규"] },
+            { date: "4/10", teachers: ["고경미", "임성숙"] },
+            { date: "4/13", teachers: ["김지수", "고경미"] },
+            { date: "4/14", teachers: ["유지연", "김현정"] },
+            { date: "4/15", teachers: ["고재덕", "류제원"] },
+            { date: "4/16", teachers: ["고재덕", "김현정"] },
+            { date: "4/17", teachers: ["고경미", "김지수"] },
+            { date: "4/20", teachers: ["유지연", "노우선"] },
+            { date: "4/21", teachers: ["류제원", "이광욱"] },
+            { date: "4/22", teachers: ["고재덕", "추재훈"] },
+            { date: "4/23", teachers: ["김현정", "임성숙"] },
+            { date: "4/24", teachers: ["고경미", "옥수민"] }
+        ];
+
+        // 식사 체크 상태를 저장할 객체 { "4/1_유지연": true, ... }
+        let dinnerState = {};
+
+        // 선생님들의 고유 목록 추출 (let으로 변경)
+        let uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers))].sort();
+
+        // 브라우저 팝업 대신 예쁜 토스트 알림을 띄우는 함수
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('-translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // 초기화
+        function init() {
+            renderSchedule();
+            updateStats();
+        }
+
+        // 상태 토글 함수
+        function toggleDinner(date, teacher) {
+            const key = `${date}_${teacher}`;
+            dinnerState[key] = !dinnerState[key];
+            updateStats();
+            
+            // 시각적 업데이트 (체크박스 스타일링)
+            const btn = document.getElementById(`btn_${key}`);
+            if (dinnerState[key]) {
+                btn.classList.remove('bg-gray-100', 'text-gray-400', 'border-gray-200');
+                btn.classList.add('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-inner');
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i> 식사 완료';
+            } else {
+                btn.classList.add('bg-gray-100', 'text-gray-400', 'border-gray-200');
+                btn.classList.remove('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-inner');
+                btn.innerHTML = '<i class="fas fa-utensils mr-1"></i> 미확인';
+            }
+        }
+
+        // 스케줄 테이블 렌더링
+        function renderSchedule() {
+            const tbody = document.getElementById('scheduleTable');
+            tbody.innerHTML = '';
+
+            rawSchedule.forEach(day => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-blue-50/50 transition duration-150';
+                
+                let rowHTML = `<td class="p-4 text-gray-700 font-medium">${day.date}</td>`;
+                
+                day.teachers.forEach((teacher, index) => {
+                    const key = `${day.date}_${teacher}`;
+                    const isChecked = dinnerState[key] || false;
+                    
+                    const btnClass = isChecked 
+                        ? 'bg-blue-500 text-white border-blue-600 shadow-inner' 
+                        : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200';
+                        
+                    const icon = isChecked ? '<i class="fas fa-check mr-1"></i> 식사 완료' : '<i class="fas fa-utensils mr-1"></i> 미확인';
+
+                    rowHTML += `
+                        <td class="p-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 shrink-0 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
+                                    ${teacher.charAt(0)}
+                                </div>
+                                <span class="font-medium text-gray-800 shrink-0 w-12">${teacher}</span>
+                                <button id="btn_${key}" onclick="toggleDinner('${day.date}', '${teacher}')" 
+                                    class="ml-2 w-24 shrink-0 flex justify-center items-center py-1.5 rounded-md border text-xs font-medium transition-all duration-200 ${btnClass}">
+                                    ${icon}
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                });
+                
+                tr.innerHTML = rowHTML;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 통계 업데이트 및 렌더링
+        function updateStats() {
+            const stats = {};
+            uniqueTeachers.forEach(t => stats[t] = 0);
+
+            // 현재 체크된 식사 횟수 계산
+            for (const key in dinnerState) {
+                if (dinnerState[key]) {
+                    const teacher = key.split('_')[1];
+                    if (stats[teacher] !== undefined) {
+                        stats[teacher]++;
+                    }
+                }
+            }
+
+            // 통계 테이블 렌더링
+            const tbody = document.getElementById('statsTable');
+            tbody.innerHTML = '';
+
+            // 횟수가 높은 순으로 정렬
+            const sortedTeachers = uniqueTeachers.sort((a, b) => stats[b] - stats[a]);
+
+            sortedTeachers.forEach(teacher => {
+                const count = stats[teacher];
+                const tr = document.createElement('tr');
+                
+                let badgeClass = count > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500';
+                
+                tr.innerHTML = `
+                    <td class="p-4 flex items-center">
+                         <div class="w-8 h-8 rounded-full ${count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'} flex items-center justify-center font-bold text-sm mr-3">
+                            ${teacher.charAt(0)}
+                        </div>
+                        <span class="font-medium ${count > 0 ? 'text-gray-800' : 'text-gray-500'}">${teacher}</span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-sm font-bold ${badgeClass}">
+                            ${count}회
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 초기화 버튼
+        function resetData() {
+            dinnerState = {};
+            renderSchedule();
+            updateStats();
+            showToast("식사 기록이 모두 초기화되었습니다.");
+        }
+
+        // --- 파일 업로드 처리 (엑셀 및 PDF 분기) ---
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileExt = file.name.split('.').pop().toLowerCase();
+
+            if (fileExt === 'pdf') {
+                processPDFFile(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    // SheetJS를 이용해 엑셀 데이터를 배열로 읽어옵니다.
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    const json = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                    
+                    processImportedData(json);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+            
+            // 동일한 파일을 다시 올릴 수 있게 input value 비우기
+            event.target.value = '';
+        }
+
+        // --- PDF 파일 텍스트 추출 및 파싱 (실험적 기능) ---
+        async function processPDFFile(file) {
+            showToast("PDF 문서를 분석 중입니다. 양식에 따라 시간이 걸릴 수 있습니다...");
+            const reader = new FileReader();
+            
+            reader.onload = async function(e) {
+                try {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument({data: typedarray}).promise;
+                    let fullText = "";
+                    
+                    // PDF의 모든 페이지 텍스트 추출
+                    for(let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(" ");
+                        fullText += pageText + " ";
+                    }
+                    
+                    // 한글 이름(2~3글자) 패턴 추출 시도
+                    const potentialNames = fullText.match(/[가-힣]{2,4}/g) || [];
+                    const excludeWords = ['일자', '교실', '비고', '진로체험', '중간고사', '자율', '학습', '당번', '안내', '배정고등학교', '학년', '시', '월', '화', '수', '목', '금', '토', '일'];
+                    const teachers = [...new Set(potentialNames.filter(name => !excludeWords.includes(name) && name.length >= 2 && name.length <= 4))];
+                    
+                    if(teachers.length > 0) {
+                        alert(`[PDF 인식 결과 안내]\n\nPDF 문서에서 아래 선생님들의 성함을 찾았습니다.\n▶ ${teachers.slice(0, 10).join(', ')} 등...\n\n⚠️ 주의사항:\nPDF는 인쇄를 위한 문서이기 때문에, 컴퓨터가 날짜(1일, 2일...)와 해당 날짜의 당번 선생님을 표 형태로 정확히 짝지어 읽어내기가 매우 어렵습니다.\n\n안정적인 통계 대시보드 운영을 위해서는 가급적 '엑셀 파일'로 명단을 업로드하시는 것을 강력히 권장해 드립니다!`);
+                        showToast("PDF 글자 추출은 완료되었으나, 자동 매칭을 위해 엑셀 양식을 권장합니다.");
+                    } else {
+                        showToast("PDF에서 선생님 명단을 찾지 못했습니다.");
+                    }
+
+                } catch (error) {
+                    console.error("PDF Parsing Error:", error);
+                    showToast("PDF 파일을 읽는 중 오류가 발생했습니다.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- 업로드된 엑셀 데이터 파싱 및 교체 ---
+        function processImportedData(data) {
+            if (!data || data.length < 2) {
+                showToast("데이터가 부족하거나 형식이 잘못되었습니다.");
+                return;
+            }
+
+            let newSchedule = [];
+            
+            // 첫 행(헤더 제목)을 무시하고 두 번째 줄부터 데이터 추출
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                if (!row || row.length === 0 || row[0] == null) continue;
+
+                const date = String(row[0]).trim(); // A열: 날짜
+                const teachers = [];
+                
+                // B열(인덱스 1)부터 있는 선생님 이름 추출
+                for(let j = 1; j < row.length; j++) {
+                    if(row[j] && String(row[j]).trim() !== '') {
+                        // 만약 하나의 칸에 "유지연, 노우선" 처럼 적혀있어도 분리되게 처리
+                        const splitTeachers = String(row[j]).split(',').map(t => t.trim()).filter(t => t !== '');
+                        teachers.push(...splitTeachers);
+                    }
+                }
+                
+                if (teachers.length > 0) {
+                    newSchedule.push({ date: date, teachers: teachers });
+                }
+            }
+
+            if (newSchedule.length > 0) {
+                rawSchedule = newSchedule;
+                uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers))].sort();
+                dinnerState = {}; // 새 명단 반영 후 식사 체크 기록 리셋
+                renderSchedule();
+                updateStats();
+                showToast("새로운 감독교사 명단이 성공적으로 반영되었습니다.");
+            } else {
+                showToast("데이터를 읽지 못했습니다. (A열:날짜, B/C열:교사이름 양식을 맞춰주세요)");
+            }
+        }
+
+        // --- 엑셀로 월간 통계 다운로드 ---
+        function downloadExcel() {
+            if (uniqueTeachers.length === 0) {
+                showToast("다운로드할 통계 데이터가 없습니다.");
+                return;
+            }
+
+            // 날짜 데이터(예: "4/1")에서 자동으로 '월'을 추출하여 파일명 및 시트명에 적용
+            let monthPrefix = "";
+            if (rawSchedule.length > 0 && String(rawSchedule[0].date).includes('/')) {
+                monthPrefix = String(rawSchedule[0].date).split('/')[0] + "월_";
+            }
+            const fileName = `${monthPrefix}자율학습_저녁식사_통계`;
+
+            // 1. 전체 일자 추출 및 변환 ("4/1" -> "4월 1일")
+            const allDates = rawSchedule.map(day => day.date);
+            const formattedDates = allDates.map(dateStr => {
+                if (dateStr.includes('/')) {
+                    const parts = dateStr.split('/');
+                    return `${parts[0]}월 ${parts[1]}일`;
+                }
+                return dateStr; // '/'가 없는 형태면 원본 유지
+            });
+
+            // 2. 엑셀 데이터 배열 준비 (첫 줄: 헤더)
+            const excelData = [];
+            const headerRow = ["선생님 성함", ...formattedDates, "합계"];
+            excelData.push(headerRow);
+
+            // 현재 식사 횟수 재계산 (정렬 및 계산용)
+            const stats = {};
+            uniqueTeachers.forEach(t => stats[t] = 0);
+            for (const key in dinnerState) {
+                if (dinnerState[key]) {
+                    const teacher = key.split('_')[1];
+                    if (stats[teacher] !== undefined) {
+                        stats[teacher]++;
+                    }
+                }
+            }
+
+            // 식사 횟수 기준 내림차순 정렬
+            const sortedTeachers = uniqueTeachers.sort((a, b) => stats[b] - stats[a]);
+
+            // 3. 각 선생님별 행 데이터 생성
+            sortedTeachers.forEach(teacher => {
+                const row = [teacher]; // 첫 번째 열: 선생님 성함
+                let total = 0;
+                
+                // 가로 전체 일자(원본 형식)를 순회하며 "O" 또는 빈칸 채우기
+                allDates.forEach(date => {
+                    const key = `${date}_${teacher}`;
+                    if (dinnerState[key]) {
+                        row.push("O"); // 식사 완료한 날짜에 "O" 표시
+                        total++;
+                    } else {
+                        row.push("");  // 식사하지 않은 날짜는 빈칸
+                    }
+                });
+                
+                row.push(total); // 마지막 열: 식사 횟수 합계
+                excelData.push(row);
+            });
+
+            // SheetJS를 사용하여 워크북 생성 후 파일 다운로드
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            
+            // 엑셀 시트 제목을 파일명과 동일하게 설정 (엑셀 시트 이름 제한인 31자를 넘지 않게 잘라줌)
+            XLSX.utils.book_append_sheet(wb, ws, fileName.substring(0, 31));
+
+            XLSX.writeFile(wb, `${fileName}.xlsx`);
+            showToast("엑셀 파일이 다운로드 되었습니다.");
+        }
+
+        // 실행
+        window.onload = init;
+    </script>
+</body>
+</html>
