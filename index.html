@@ -16,7 +16,7 @@
 </head>
 <body class="bg-gray-50 p-4 md:p-8 font-sans">
 
-    <!-- Toast 알림창 (추가됨) -->
+    <!-- Toast 알림창 -->
     <div id="toast" class="fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded shadow-lg transform -translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center pointer-events-none">
         <i class="fas fa-info-circle mr-2"></i>
         <span id="toastMessage">메시지</span>
@@ -57,7 +57,8 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-600 text-sm border-b border-gray-100">
-                                <th class="p-4 font-semibold w-24">일자</th>
+                                <!-- 날짜 너비 증가(w-32) 및 줄바꿈 방지(whitespace-nowrap) 추가 -->
+                                <th class="p-4 font-semibold w-32 whitespace-nowrap">일자</th>
                                 <th class="p-4 font-semibold">감독 교사 1</th>
                                 <th class="p-4 font-semibold">감독 교사 2</th>
                             </tr>
@@ -170,7 +171,8 @@
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-blue-50/50 transition duration-150';
                 
-                let rowHTML = `<td class="p-4 text-gray-700 font-medium">${day.date}</td>`;
+                // 줄바꿈 방지(whitespace-nowrap) 추가
+                let rowHTML = `<td class="p-4 text-gray-700 font-medium whitespace-nowrap">${day.date}</td>`;
                 
                 // 데이터가 비어있거나 올바르지 않은 경우를 대비한 안전 장치 추가
                 const teachersList = day.teachers || [];
@@ -216,7 +218,7 @@
             const stats = {};
             uniqueTeachers.forEach(t => stats[t] = 0);
 
-            // 현재 체크된 식사 횟수 계산
+            // 현재 체크된 식사 횟 계산
             for (const key in dinnerState) {
                 if (dinnerState[key]) {
                     const teacher = key.split('_')[1];
