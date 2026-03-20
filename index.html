@@ -57,10 +57,10 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-600 text-sm border-b border-gray-100">
-                                <!-- 날짜 너비 증가(w-32) 및 줄바꿈 방지(whitespace-nowrap) 추가 -->
-                                <th class="p-4 font-semibold w-32 whitespace-nowrap">일자</th>
-                                <th class="p-4 font-semibold">감독 교사 1</th>
-                                <th class="p-4 font-semibold">감독 교사 2</th>
+                                <!-- 날짜 너비 증가 및 최소 너비 강제 지정(min-w-[120px]), 줄바꿈 방지 유지 -->
+                                <th class="p-4 font-semibold w-36 min-w-[120px] whitespace-nowrap">일자</th>
+                                <th class="p-4 font-semibold min-w-[160px]">감독 교사 1</th>
+                                <th class="p-4 font-semibold min-w-[160px]">감독 교사 2</th>
                             </tr>
                         </thead>
                         <tbody id="scheduleTable" class="divide-y divide-gray-100">
@@ -97,7 +97,7 @@
     </div>
 
     <script>
-        // PDF에서 추출한 4월 당번 데이터 (업데이트 가능하도록 let으로 변경)
+        // PDF에서 추출한 4월 당번 데이터
         let rawSchedule = [
             { date: "4/1", teachers: ["유지연", "노우선"] },
             { date: "4/2", teachers: ["류제원", "이동규"] },
@@ -114,15 +114,27 @@
             { date: "4/20", teachers: ["유지연", "노우선"] },
             { date: "4/21", teachers: ["류제원", "이광욱"] },
             { date: "4/22", teachers: ["고재덕", "추재훈"] },
-            { date: "4/23", teachers: ["김현정", "임성숙"] }, // 오타(매teachers) 수정됨
+            { date: "4/23", teachers: ["김현정", "임성숙"] },
             { date: "4/24", teachers: ["고경미", "옥수민"] }
         ];
 
         // 식사 체크 상태를 저장할 객체 { "4/1_유지연": true, ... }
         let dinnerState = {};
 
-        // 선생님들의 고유 목록 추출 (let으로 변경, 안전을 위해 || [] 추가)
+        // 선생님들의 고유 목록 추출
         let uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
+
+        // 날짜를 "00월 00일" 형태로 일관되게 바꿔주는 포맷터 함수 추가
+        function formatDisplayDate(dateStr) {
+            if (!dateStr) return "";
+            if (dateStr.includes('/')) {
+                const parts = dateStr.split('/');
+                const month = parts[0].trim().padStart(2, '0');
+                const day = parts[1].trim().padStart(2, '0');
+                return `${month}월 ${day}일`;
+            }
+            return dateStr; // 이미 "03월 02일" 형태라면 그대로 반환
+        }
 
         // 브라우저 팝업 대신 예쁜 토스트 알림을 띄우는 함수
         function showToast(message) {
@@ -171,8 +183,11 @@
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-blue-50/50 transition duration-150';
                 
-                // 줄바꿈 방지(whitespace-nowrap) 추가
-                let rowHTML = `<td class="p-4 text-gray-700 font-medium whitespace-nowrap">${day.date}</td>`;
+                // 표시용 날짜를 "04월 01일" 형태로 변환
+                const displayDate = formatDisplayDate(day.date);
+
+                // 줄바꿈 방지(whitespace-nowrap) 유지
+                let rowHTML = `<td class="p-4 text-gray-700 font-bold whitespace-nowrap tracking-wide">${displayDate}</td>`;
                 
                 // 데이터가 비어있거나 올바르지 않은 경우를 대비한 안전 장치 추가
                 const teachersList = day.teachers || [];
@@ -189,7 +204,7 @@
 
                     rowHTML += `
                         <td class="p-4">
-                            <div class="flex items-center space-x-3">
+                            <div class="flex items-center space-x-3 whitespace-nowrap">
                                 <div class="w-8 h-8 shrink-0 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
                                     ${teacher.charAt(0)}
                                 </div>
@@ -440,15 +455,9 @@
             }
             const fileName = `${monthPrefix}자율학습_저녁식사_통계`;
 
-            // 1. 전체 일자 추출 및 변환 (만약 "4/1"형식이면 "4월 1일"로, 이미 "03월 02일"형식이면 원본 유지)
+            // 1. 전체 일자 추출 및 변환 (만약 "4/1"형식이면 "04월 01일"로, 이미 "03월 02일"형식이면 원본 유지)
             const allDates = rawSchedule.map(day => day.date);
-            const formattedDates = allDates.map(dateStr => {
-                if (dateStr.includes('/')) {
-                    const parts = dateStr.split('/');
-                    return `${parts[0]}월 ${parts[1]}일`;
-                }
-                return dateStr;
-            });
+            const formattedDates = allDates.map(dateStr => formatDisplayDate(dateStr));
 
             // 2. 엑셀 데이터 배열 준비 (첫 줄: 헤더)
             const excelData = [];
