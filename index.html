@@ -26,20 +26,18 @@
     <div id="ruleErrorModal" class="fixed inset-0 bg-black bg-opacity-60 z-[100] hidden flex items-center justify-center p-4">
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl max-w-2xl w-full border-t-8 border-red-500">
             <h2 class="text-2xl font-bold text-red-600 mb-4 flex items-center">
-                <i class="fas fa-lock mr-3 text-3xl"></i> 데이터베이스 쓰기 권한 잠김
+                <i class="fas fa-lock mr-3 text-3xl"></i> 데이터베이스 접근 오류
             </h2>
             <p class="text-gray-700 mb-4 leading-relaxed">
-                현재 연결된 파이어베이스 데이터베이스가 <strong>보안을 위해 잠겨 있어</strong> 데이터를 저장하거나 읽을 수 없습니다.<br>
-                담당자 선생님께서는 아래 순서대로 접속하여 데이터베이스 권한을 풀어주세요!
+                현재 연결된 파이어베이스 데이터베이스가 생성되지 않았거나, <strong>보안을 위해 잠겨 있어</strong> 데이터를 저장할 수 없습니다.<br>
+                담당자 선생님께서는 아래 2가지 사항을 확인해주세요!
             </p>
             <div class="bg-blue-50 p-5 rounded-xl text-sm text-gray-800 mb-6 border border-blue-100">
-                <p class="font-bold mb-2">✅ 해결 방법 (규칙 변경)</p>
-                <ol class="list-decimal ml-5 space-y-1 mb-4 font-medium">
-                    <li>Firebase 콘솔 사이트에 접속하여 해당 프로젝트를 엽니다.</li>
-                    <li>왼쪽 메뉴에서 <strong>[Firestore Database]</strong>를 클릭합니다.</li>
-                    <li>상단의 여러 탭 중 <strong>[규칙 (Rules)]</strong> 탭을 클릭합니다.</li>
-                    <li>기존에 적힌 코드를 모두 지우고 <strong>아래의 코드로 똑같이 덮어씁니다.</strong></li>
-                    <li>우측 상단의 파란색 <strong>[게시 (Publish)]</strong> 버튼을 누릅니다.</li>
+                <p class="font-bold mb-2">✅ 해결 방법</p>
+                <ol class="list-decimal ml-5 space-y-2 mb-4 font-medium">
+                    <li><strong>데이터베이스 생성:</strong> Firebase 콘솔 메뉴의 [Firestore Database]에서 <strong>'데이터베이스 만들기'</strong> 버튼을 클릭했는지 확인합니다.</li>
+                    <li><strong>규칙 변경:</strong> 데이터베이스가 생성되었다면, 상단의 <strong>[규칙 (Rules)]</strong> 탭을 클릭합니다.</li>
+                    <li>기존 코드를 모두 지우고 <strong>아래 코드로 덮어쓴 뒤 [게시(Publish)]</strong> 버튼을 누릅니다.</li>
                 </ol>
                 <div class="bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm shadow-inner overflow-x-auto">
                     rules_version = '2';<br>
@@ -62,17 +60,21 @@
         <!-- Header -->
         <header class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-utensils text-blue-500 mr-2"></i>배정고 1학년 자율학습 식사 체크</h1>
-                <p class="text-gray-500 mt-1">당번 선생님 저녁 식사 여부 및 통계 대시보드 <span class="font-bold text-blue-600">(v2.0 클라우드 최적화)</span></p>
+                <!-- 월(Month) 선택 드롭다운 (우측으로 이동됨에 따라 제거) -->
+                <h1 class="text-2xl font-bold text-gray-800 flex items-center flex-wrap gap-2">
+                    <i class="fas fa-utensils text-blue-500"></i>
+                    <span>배정고 1학년 자율학습 식사 체크</span>
+                </h1>
+                <p class="text-gray-500 mt-2 text-sm">당번 선생님 저녁 식사 여부 및 통계 대시보드 <span class="font-bold text-blue-600">(v3.2 월별 보관함 레이아웃 개선)</span></p>
             </div>
             <div class="flex flex-wrap gap-2 items-center">
                 <div class="relative group">
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .pdf" class="hidden" onchange="handleFileUpload(event)">
                     <label for="fileInput" class="px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition duration-200 text-sm font-medium border border-gray-200 cursor-pointer inline-flex items-center shadow-sm">
-                        <i class="fas fa-file-upload mr-1"></i> 새 명단
+                        <i class="fas fa-file-upload mr-1"></i> 새 명단 업로드
                     </label>
                     <div class="absolute right-0 top-full mt-2 w-72 bg-gray-800 text-white text-xs rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                        CSV 및 엑셀 명단 파일을 올려주세요. 모든 접속자에게 즉시 반영됩니다.
+                        파일을 올리면 자동으로 이번 달 명단 보관함이 생성됩니다.
                     </div>
                 </div>
                 <button onclick="saveChanges()" id="saveBtn" class="px-5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm font-bold shadow-md flex items-center">
@@ -106,11 +108,22 @@
 
             <!-- Right Column: Statistics -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-fit">
-                <div class="p-5 border-b border-gray-100 bg-blue-50 flex justify-between items-center">
-                    <h2 class="text-lg font-bold text-blue-800">📊 월간 식사 통계</h2>
-                    <button onclick="downloadExcel()" class="px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-200 text-xs font-medium shadow-sm flex items-center">
-                        <i class="fas fa-file-excel mr-1"></i> 엑셀 저장
-                    </button>
+                <div class="p-5 border-b border-gray-100 bg-blue-50 flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                        <h2 id="statsTitle" class="text-lg font-bold text-blue-800">📊 월간 식사 통계</h2>
+                        <button onclick="downloadExcel()" class="px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-200 text-xs font-medium shadow-sm flex items-center">
+                            <i class="fas fa-file-excel mr-1"></i> 엑셀 저장
+                        </button>
+                    </div>
+                    <!-- 메인 제목에서 이동해 온 월(Month) 선택기 -->
+                    <div class="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-200 shadow-sm">
+                        <span class="text-sm font-medium text-blue-800 flex items-center">
+                            <i class="fas fa-calendar-check mr-2 text-blue-500"></i>과거 기록 보기
+                        </span>
+                        <select id="monthSelector" onchange="changeMonth(this.value)" class="bg-purple-50 text-purple-700 border border-purple-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 cursor-pointer transition font-medium">
+                            <option value="">월 기록 없음</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="p-0">
                     <table class="w-full text-left">
@@ -139,14 +152,21 @@
         window.downloadExcel = downloadExcel;
         window.toggleDinner = toggleDinner;
         window.saveChanges = saveChanges; 
+        window.changeMonth = changeMonth;
 
+        // =========================================================================
+        // [데이터 보관함 구조] 월별(과거) 데이터를 누적해서 저장하기 위한 변수
+        // =========================================================================
+        let gradeData = { months: {}, currentMonth: "" };
+        let currentViewMonth = ""; // 사용자가 현재 화면에서 보고 있는 '달(월)'
         let rawSchedule = [];
         let dinnerState = {};
         let uniqueTeachers = [];
         let hasUnsavedChanges = false; 
+        let unsubscribeSnapshot = null; 
 
         // =========================================================================
-        // [중요] 선생님의 고유 파이어베이스 접속 열쇠 (완벽 적용됨)
+        // [중요] 선생님의 고유 파이어베이스 접속 열쇠
         // =========================================================================
         const myFirebaseConfig = {
             apiKey: "AIzaSyDsp5MMHtEtouTN2KizWiqyxnZQflGZS0g",
@@ -194,17 +214,121 @@
             renderEmptyState();
         }
 
+        // --- 명단 엑셀에서 날짜를 분석해 "O월" 이라는 이름을 뽑아내는 함수 ---
+        function extractMonthText(schedule) {
+            if (!schedule || schedule.length === 0) return "미상";
+            const firstDateText = String(schedule[0].date);
+            if (firstDateText.includes('월')) return firstDateText.split('월')[0].trim() + '월';
+            if (firstDateText.includes('/')) return firstDateText.split('/')[0].trim() + '월';
+            return "미상";
+        }
+
+        // --- 상단의 월(Month) 선택 드롭다운 메뉴를 업데이트 하는 함수 ---
+        function updateMonthDropdown() {
+            const monthSelector = document.getElementById('monthSelector');
+            if (!gradeData.months) gradeData.months = {};
+            const months = Object.keys(gradeData.months).sort((a, b) => {
+                const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+                const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+                return numB - numA; // 가장 최근 달(숫자가 높은 달)이 맨 위에 오도록 정렬
+            });
+
+            monthSelector.innerHTML = '';
+            if (months.length > 0) {
+                months.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m;
+                    option.textContent = m + ' 기록';
+                    if (m === currentViewMonth) option.selected = true;
+                    monthSelector.appendChild(option);
+                });
+                monthSelector.disabled = false;
+                monthSelector.classList.remove('opacity-50', 'bg-gray-100', 'text-gray-500', 'border-gray-200');
+                monthSelector.classList.add('bg-purple-50', 'text-purple-700', 'border-purple-200');
+            } else {
+                monthSelector.innerHTML = '<option value="">월 기록 없음</option>';
+                monthSelector.disabled = true;
+                monthSelector.classList.remove('bg-purple-50', 'text-purple-700', 'border-purple-200');
+                monthSelector.classList.add('opacity-50', 'bg-gray-100', 'text-gray-500', 'border-gray-200');
+            }
+        }
+
+        // --- 사용자가 드롭다운에서 다른 달(Month)을 선택했을 때 실행되는 함수 ---
+        async function changeMonth(month) {
+            if (hasUnsavedChanges) {
+                const confirmLeave = confirm("저장되지 않은 변경사항이 있습니다. 무시하고 다른 달의 기록을 보시겠습니까?");
+                if (!confirmLeave) {
+                    document.getElementById('monthSelector').value = currentViewMonth;
+                    return;
+                }
+            }
+            
+            currentViewMonth = month;
+            if (gradeData.months[currentViewMonth]) {
+                rawSchedule = gradeData.months[currentViewMonth].rawSchedule || [];
+                dinnerState = gradeData.months[currentViewMonth].dinnerState || {};
+                uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
+            } else {
+                rawSchedule = [];
+                dinnerState = {};
+                uniqueTeachers = [];
+            }
+            
+            hasUnsavedChanges = false;
+            document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+            
+            if (rawSchedule.length === 0) {
+                renderEmptyState();
+            } else {
+                updateTitle();
+                renderSchedule();
+                updateStats();
+            }
+        }
+
         // --- 클라우드 실시간 데이터 수신 ---
         function listenToData() {
             if (!currentUser || !db) return;
+            
+            // 1학년 전용 단일 경로로 원복
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
             
-            onSnapshot(docRef, (snapshot) => {
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+            }
+            
+            unsubscribeSnapshot = onSnapshot(docRef, (snapshot) => {
                 if (snapshot.exists()) {
                     const data = snapshot.data();
-                    rawSchedule = data.rawSchedule || [];
-                    dinnerState = data.dinnerState || {};
-                    uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
+                    
+                    // [과거 데이터 호환성 패치] 옛날 방식(서랍 없이 널려있던 명단)을 새 서랍(months) 안으로 예쁘게 옮겨 담아줍니다.
+                    if (data.rawSchedule && !data.months) {
+                        const m = extractMonthText(data.rawSchedule);
+                        gradeData = {
+                            months: { [m]: { rawSchedule: data.rawSchedule, dinnerState: data.dinnerState || {} } },
+                            currentMonth: m
+                        };
+                    } else {
+                        gradeData = data.months ? data : { months: {}, currentMonth: "" };
+                    }
+
+                    // 현재 보고 있는 달이 없거나 지워졌다면 최신 달(currentMonth)로 보여줍니다.
+                    if (!currentViewMonth || !gradeData.months[currentViewMonth]) {
+                        currentViewMonth = gradeData.currentMonth;
+                    }
+
+                    updateMonthDropdown();
+
+                    // 화면에 데이터 적용
+                    if (currentViewMonth && gradeData.months[currentViewMonth]) {
+                        rawSchedule = gradeData.months[currentViewMonth].rawSchedule || [];
+                        dinnerState = gradeData.months[currentViewMonth].dinnerState || {};
+                        uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
+                    } else {
+                        rawSchedule = [];
+                        dinnerState = {};
+                        uniqueTeachers = [];
+                    }
                     
                     hasUnsavedChanges = false;
                     document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
@@ -217,67 +341,79 @@
                         updateStats();
                     }
                 } else {
+                    gradeData = { months: {}, currentMonth: "" };
+                    currentViewMonth = "";
+                    updateMonthDropdown();
                     renderEmptyState();
                 }
             }, (error) => {
                 console.error("동기화 에러:", error);
                 document.getElementById('checklistTitle').innerHTML = `⚠️ 권한 잠김: 모달 안내 참조`;
-                // 읽기 권한이 없을 때 모달 띄우기
                 document.getElementById('ruleErrorModal').classList.remove('hidden');
             });
         }
 
-        // --- 클라우드에 데이터 저장하기 ---
+        // --- 클라우드에 데이터 저장 (월별 보관함에 쏙 넣기) ---
         async function saveDataToCloud() {
             if (!db) return;
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
-            try {
-                // 안전한 저장을 위해 데이터 정제
-                const safeSchedule = JSON.parse(JSON.stringify(rawSchedule));
-                const safeDinnerState = JSON.parse(JSON.stringify(dinnerState));
+            
+            // 현재 화면에 떠 있는 데이터를 해당 달(Month) 서랍에 정돈해서 넣습니다.
+            if (currentViewMonth) {
+                gradeData.months[currentViewMonth] = {
+                    rawSchedule: JSON.parse(JSON.stringify(rawSchedule)),
+                    dinnerState: JSON.parse(JSON.stringify(dinnerState))
+                };
+                gradeData.currentMonth = currentViewMonth; 
+            }
 
-                await setDoc(docRef, {
-                    rawSchedule: safeSchedule,
-                    dinnerState: safeDinnerState
-                });
+            try {
+                await setDoc(docRef, gradeData);
             } catch (error) {
                 console.error("Save error: ", error);
-                // 쓰기 권한이 없거나 저장에 실패했을 때 명확하게 에러 알림 띄우기
-                alert("🚨 저장이 실패했습니다! 데이터베이스 잠금(규칙)을 해제해주세요.");
-                document.getElementById('ruleErrorModal').classList.remove('hidden');
                 throw error; 
             }
         }
 
-        // --- 명시적 [저장하기] 버튼 클릭 시 동작하는 함수 ---
+        async function saveWithTimeout() {
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("TIMEOUT")), 10000)
+            );
+            return Promise.race([saveDataToCloud(), timeoutPromise]);
+        }
+
         async function saveChanges() {
             if (!firebaseConfig) {
                 alert("⚠️ 파이어베이스 설정 코드가 없어 저장이 불가능합니다.");
                 return;
             }
 
-            // 시각적 피드백: 저장 버튼을 로딩 상태로 변경
             const saveBtn = document.getElementById('saveBtn');
             const originalHTML = saveBtn.innerHTML;
             saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 저장 중...';
             saveBtn.disabled = true;
 
             try {
-                await saveDataToCloud(); 
+                await saveWithTimeout(); 
                 
-                // 데이터베이스 저장 성공
                 hasUnsavedChanges = false;
                 saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
                 
                 saveBtn.innerHTML = originalHTML;
                 saveBtn.disabled = false;
                 
-                showToast("저장을 완료했습니다.");
-                alert("✅ 저장을 완료했습니다!");
+                showToast(`1학년 ${currentViewMonth} 기록 저장을 완료했습니다.`);
+                alert(`✅ 1학년 ${currentViewMonth} 기록 저장을 완료했습니다!`);
             } catch(e) {
-                // 에러 발생 시 버튼 복구
                 saveBtn.innerHTML = originalHTML;
                 saveBtn.disabled = false;
+
+                if (e.message === "TIMEOUT") {
+                    alert("🚨 응답 시간 초과!\n\nFirebase 콘솔에서 데이터베이스 생성을 확인해주세요.");
+                } else {
+                    alert("🚨 저장이 실패했습니다! 데이터베이스 규칙을 확인해주세요.");
+                }
+                document.getElementById('ruleErrorModal').classList.remove('hidden');
             }
         }
 
@@ -346,19 +482,15 @@
                     <tr>
                         <td colspan="3" class="p-10 text-center text-red-600 font-bold bg-red-50 border-y border-red-200">
                             <i class="fas fa-exclamation-triangle text-3xl mb-3"></i><br>
-                            Firebase 접속 코드(config)가 빠져 있습니다!<br>
-                            <span class="text-sm font-normal text-gray-700 mt-2 block">
-                                현재 상태로는 명단을 올리거나 체크를 해도 <strong>브라우저를 닫으면 데이터가 모두 날아갑니다.</strong><br>
-                                코드 162번째 줄에 선생님의 Firebase config를 넣고 깃허브에 다시 올려주세요.
-                            </span>
+                            Firebase 접속 코드(config)가 빠져 있습니다!
                         </td>
                     </tr>`;
             } else {
-                document.getElementById('checklistTitle').innerHTML = `📅 명단 등록 대기 중`;
+                document.getElementById('checklistTitle').innerHTML = `📅 1학년 명단 대기 중`;
                 document.getElementById('scheduleTable').innerHTML = `
                     <tr>
                         <td colspan="3" class="p-10 text-center text-gray-500 font-medium">
-                            현재 클라우드에 등록된 명단이 없습니다.<br>담당자 선생님께서는 우측 상단의 <strong class="text-blue-500">새 명단</strong> 버튼을 눌러 엑셀 파일을 올려주세요.
+                            현재 클라우드에 등록된 <strong>1학년</strong> 명단 기록이 없습니다.<br>담당자 선생님께서는 우측 상단의 <strong class="text-blue-500">새 명단 업로드</strong> 버튼을 눌러 파일을 올려주세요.
                         </td>
                     </tr>`;
             }
@@ -366,16 +498,7 @@
         }
 
         function updateTitle() {
-            if (rawSchedule.length > 0) {
-                const firstDateText = rawSchedule[0].date;
-                let monthText = '새로운';
-                if (firstDateText.includes('월')) {
-                    monthText = firstDateText.split('월')[0] + '월';
-                } else if (firstDateText.includes('/')) {
-                    monthText = firstDateText.split('/')[0] + '월';
-                }
-                document.getElementById('checklistTitle').innerHTML = `📅 ${monthText} 체크리스트`;
-            }
+            document.getElementById('checklistTitle').innerHTML = `📅 1학년 ${currentViewMonth} 체크리스트`;
         }
 
         function renderSchedule() {
@@ -571,35 +694,54 @@
             let newSchedule = Array.from(newScheduleMap, ([date, teachers]) => ({ date, teachers }));
 
             if (newSchedule.length > 0) {
+                const uploadedMonth = extractMonthText(newSchedule);
+                
+                if (gradeData.months && gradeData.months[uploadedMonth] && Object.keys(gradeData.months[uploadedMonth].dinnerState || {}).length > 0) {
+                    const overwrite = confirm(`⚠️ ${uploadedMonth} 기록이 이미 존재합니다.\n\n새 명단을 올리면 기존에 선생님들이 체크해둔 식사 여부가 모두 지워지고 새로 덮어씌워집니다. 진행하시겠습니까?`);
+                    if (!overwrite) return;
+                }
+
+                currentViewMonth = uploadedMonth;
                 rawSchedule = newSchedule;
                 uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
                 dinnerState = {}; 
                 
+                if (!gradeData.months) gradeData.months = {};
+                gradeData.months[uploadedMonth] = {
+                    rawSchedule: rawSchedule,
+                    dinnerState: dinnerState
+                };
+                gradeData.currentMonth = uploadedMonth;
+
+                updateMonthDropdown();
                 updateTitle();
                 renderSchedule();
                 updateStats();
                 
                 if(firebaseConfig) {
+                    const saveBtn = document.getElementById('saveBtn');
+                    const originalHTML = saveBtn.innerHTML;
+                    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 저장 중...';
+                    
                     try {
-                        const saveBtn = document.getElementById('saveBtn');
-                        const originalHTML = saveBtn.innerHTML;
-                        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 저장 중...';
-                        
-                        // 저장이 성공했을 때만 팝업이 뜹니다.
-                        await saveDataToCloud();
+                        await saveWithTimeout();
                         hasUnsavedChanges = false;
                         saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
                         saveBtn.innerHTML = originalHTML;
                         
-                        showToast("저장을 완료했습니다.");
-                        alert("✅ 명단 업로드 및 저장을 완료했습니다!");
+                        showToast(`1학년 ${currentViewMonth} 명단 생성을 완료했습니다.`);
+                        alert(`✅ 1학년 ${currentViewMonth} 명단 업로드 및 저장을 완료했습니다!`);
                     } catch(e) {
-                        // 저장이 실패하면 위에서 추가한 에러 경고창이 작동합니다.
-                        const saveBtn = document.getElementById('saveBtn');
-                        saveBtn.innerHTML = '<i class="fas fa-save mr-1"></i> 저장하기';
+                        saveBtn.innerHTML = originalHTML;
+                        if (e.message === "TIMEOUT") {
+                            alert("🚨 응답 시간 초과!\n\nFirebase 데이터베이스 생성을 확인해주세요.");
+                        } else {
+                            alert("🚨 저장이 실패했습니다! 규칙을 확인해주세요.");
+                        }
+                        document.getElementById('ruleErrorModal').classList.remove('hidden');
                     }
                 } else {
-                    showToast("⚠️ 임시 명단이 등록되었습니다. (DB 연결 안됨)");
+                    showToast("⚠️ 임시 명단이 등록되었습니다.");
                 }
             } else {
                 showToast("데이터를 읽지 못했습니다. 맨 앞칸이 '날짜', '감독교사1', '감독교사2'인 양식을 확인해주세요.");
@@ -612,16 +754,8 @@
                 return;
             }
 
-            let monthPrefix = "";
-            if (rawSchedule.length > 0) {
-                const firstDate = String(rawSchedule[0].date);
-                if (firstDate.includes('/')) {
-                    monthPrefix = firstDate.split('/')[0] + "월_";
-                } else if (firstDate.includes('월')) {
-                    monthPrefix = firstDate.split('월')[0].trim() + "월_";
-                }
-            }
-            const fileName = `${monthPrefix}자율학습_저녁식사_통계`;
+            let monthPrefix = currentViewMonth !== "미상" ? currentViewMonth + "_" : "";
+            const fileName = `1학년_${monthPrefix}자율학습_저녁식사_통계`;
 
             const allDates = rawSchedule.map(day => day.date);
             const excelDates = allDates.map(dateStr => formatExcelDate(dateStr));
@@ -704,7 +838,7 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, fileName.substring(0, 31));
             XLSX.writeFile(wb, `${fileName}.xlsx`);
-            showToast("엑셀 파일이 다운로드 되었습니다.");
+            showToast(`1학년 ${currentViewMonth} 엑셀 파일이 다운로드 되었습니다.`);
         }
     </script>
 </body>
