@@ -112,9 +112,36 @@
         let dinnerState = {};
         let uniqueTeachers = [];
 
-        // 클라우드 접속 정보
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // =========================================================================
+        // [중요] 깃허브(GitHub) 배포 시 아래 영역에 선생님의 Firebase 설정을 넣어주세요!
+        // =========================================================================
+        // Firebase 프로젝트를 만드신 후 발급받은 config 코드를 아래 null 대신 붙여넣어주세요.
+        // 예시: 
+        // const myFirebaseConfig = {
+        //     apiKey: "AIzaSyC...",
+        //     authDomain: "my-school-app.firebaseapp.com",
+        //     projectId: "my-school-app",
+        //     storageBucket: "my-school-app.appspot.com",
+        //     messagingSenderId: "1234567890",
+        //     appId: "1:1234567890:web:abcdef123456"
+        // };
+        const myFirebaseConfig = {
+  apiKey: "AIzaSyAHynq2ZeElY-eyIm3XrhIEAKpjospVBqI",
+  authDomain: "teacher-dinner-count-1st.firebaseapp.com",
+  projectId: "teacher-dinner-count-1st",
+  storageBucket: "teacher-dinner-count-1st.firebasestorage.app",
+  messagingSenderId: "418360271187",
+  appId: "1:418360271187:web:b3611daab61f32040501a6",
+  measurementId: "G-FR01QTLZE5"
+}; 
+        // =========================================================================
+
+        // 클라우드 접속 정보 (제미나이 환경 우선, 깃허브 등 외부일 경우 선생님의 설정 사용)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : myFirebaseConfig;
+        
+        // 데이터베이스 문서 고유 경로용 ID
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'school-dinner-app-public';
+        
         let app, auth, db, currentUser;
 
         // 클라우드 초기화
@@ -140,13 +167,15 @@
                 }
             });
         } else {
-            showToast("⚠️ 클라우드 환경에 연결되지 않았습니다. 새로고침 시 데이터가 삭제됩니다.");
+            // DB 접속 정보가 없을 경우(깃허브 배포 후 myFirebaseConfig를 넣지 않았을 때) 에러 메시지 표시
+            showToast("⚠️ 클라우드 설정이 없습니다. 깃허브 배포 시 Firebase 접속 코드를 넣어주세요. (새로고침 시 초기화됨)");
             renderEmptyState();
         }
 
         // --- 클라우드에서 실시간으로 데이터 받아오기 ---
         function listenToData() {
-            if (!currentUser) return;
+            if (!currentUser || !db) return;
+            // 모두가 공통으로 바라보는 데이터베이스 문서 경로
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
             
             onSnapshot(docRef, (snapshot) => {
@@ -164,7 +193,6 @@
                         updateStats();
                     }
                 } else {
-                    // 데이터베이스에 내용이 아예 없으면 빈 화면 렌더링
                     renderEmptyState();
                 }
             }, (error) => {
@@ -248,7 +276,7 @@
             const key = `${date}_${teacher}`;
             dinnerState[key] = !dinnerState[key];
             
-            // 시각적 업데이트 최적화 (버튼 및 통계 부분만)
+            // 시각적 업데이트 최적화
             const btn = document.getElementById(`btn_${key}`);
             if (dinnerState[key]) {
                 btn.classList.remove('bg-gray-100', 'text-gray-400', 'border-gray-200');
@@ -262,8 +290,12 @@
             
             updateStats();
             
-            // 변경된 체크 상태를 클라우드에 전송 (모든 접속자에게 실시간 적용됨)
-            saveDataToCloud();
+            // DB 접속 상태라면 데이터 전송
+            if(firebaseConfig) {
+                saveDataToCloud();
+            } else {
+                showToast("⚠️ DB 설정이 없어 내역이 브라우저에만 임시로 남습니다.");
+            }
         }
 
         function renderSchedule() {
@@ -354,9 +386,13 @@
             dinnerState = {};
             renderSchedule();
             updateStats();
-            // 초기화된 기록을 클라우드에 덮어쓰기
-            saveDataToCloud();
-            showToast("식사 기록이 모두 초기화되었습니다. 다른 접속자들의 화면도 함께 초기화됩니다.");
+            
+            if(firebaseConfig) {
+                saveDataToCloud();
+                showToast("식사 기록이 모두 초기화되었습니다. 다른 접속자들의 화면도 함께 초기화됩니다.");
+            } else {
+                showToast("⚠️ 임시 데이터가 초기화되었습니다.");
+            }
         }
 
         // --- 파일 업로드 처리 ---
@@ -478,9 +514,12 @@
                 renderSchedule();
                 updateStats();
                 
-                // 새로운 명단을 클라우드에 전송 (모두의 화면이 이 명단으로 변경됨)
-                saveDataToCloud();
-                showToast("새 명단이 클라우드에 성공적으로 등록되었습니다. 모든 사람에게 반영됩니다.");
+                if(firebaseConfig) {
+                    saveDataToCloud();
+                    showToast("새 명단이 클라우드에 성공적으로 등록되었습니다. 모든 사람에게 반영됩니다.");
+                } else {
+                    showToast("⚠️ 임시 명단이 등록되었습니다. (DB 연결 안됨)");
+                }
             } else {
                 showToast("데이터를 읽지 못했습니다. 맨 앞칸이 '날짜', '감독교사1', '감독교사2'인 양식을 확인해주세요.");
             }
