@@ -14,12 +14,48 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     </script>
 </head>
-<body class="bg-gray-50 p-4 md:p-8 font-sans">
+<body class="bg-gray-50 p-4 md:p-8 font-sans relative">
 
     <!-- Toast 알림창 -->
     <div id="toast" class="fixed top-4 right-4 bg-gray-800 text-white px-6 py-3 rounded shadow-lg transform -translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center pointer-events-none">
         <i class="fas fa-info-circle mr-2"></i>
         <span id="toastMessage">메시지</span>
+    </div>
+
+    <!-- 🚨 Firestore 권한 에러 안내 모달 (새로 추가됨) 🚨 -->
+    <div id="ruleErrorModal" class="fixed inset-0 bg-black bg-opacity-60 z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl max-w-2xl w-full border-t-8 border-red-500">
+            <h2 class="text-2xl font-bold text-red-600 mb-4 flex items-center">
+                <i class="fas fa-lock mr-3 text-3xl"></i> 데이터베이스 쓰기 권한 잠김
+            </h2>
+            <p class="text-gray-700 mb-4 leading-relaxed">
+                현재 연결된 파이어베이스 데이터베이스가 <strong>보안을 위해 잠겨 있어(프로덕션 모드)</strong> 데이터를 저장하거나 읽을 수 없습니다.<br>
+                담당자 선생님께서는 아래 순서대로 접속하여 데이터베이스 권한을 풀어주세요!
+            </p>
+            <div class="bg-blue-50 p-5 rounded-xl text-sm text-gray-800 mb-6 border border-blue-100">
+                <p class="font-bold mb-2">✅ 해결 방법 (규칙 변경)</p>
+                <ol class="list-decimal ml-5 space-y-1 mb-4 font-medium">
+                    <li>Firebase 콘솔 사이트에 접속하여 해당 프로젝트를 엽니다.</li>
+                    <li>왼쪽 메뉴에서 <strong>[Firestore Database]</strong>를 클릭합니다.</li>
+                    <li>상단의 여러 탭 중 <strong>[규칙 (Rules)]</strong> 탭을 클릭합니다.</li>
+                    <li>기존에 적힌 코드를 모두 지우고 <strong>아래의 코드로 똑같이 덮어씁니다.</strong></li>
+                    <li>우측 상단의 파란색 <strong>[게시 (Publish)]</strong> 버튼을 누릅니다.</li>
+                </ol>
+                <div class="bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm shadow-inner overflow-x-auto">
+                    rules_version = '2';<br>
+                    service cloud.firestore {<br>
+                    &nbsp;&nbsp;match /databases/{database}/documents {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;match /{document=**} {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="text-yellow-300 font-bold">allow read, write: if true;</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                    &nbsp;&nbsp;}<br>
+                    }
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <button onclick="document.getElementById('ruleErrorModal').classList.add('hidden')" class="px-6 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-bold transition">닫기</button>
+            </div>
+        </div>
     </div>
 
     <div class="max-w-5xl mx-auto space-y-6">
@@ -42,7 +78,6 @@
                 <button onclick="resetData()" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition duration-200 text-sm font-medium border border-red-200 shadow-sm">
                     <i class="fas fa-rotate-right mr-1"></i> 초기화
                 </button>
-                <!-- 새로 추가된 저장하기 버튼 -->
                 <button onclick="saveChanges()" id="saveBtn" class="px-5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm font-bold shadow-md flex items-center">
                     <i class="fas fa-save mr-1"></i> 저장하기
                 </button>
@@ -97,7 +132,6 @@
         </div>
     </div>
 
-    <!-- 모듈 타입 스크립트로 변경 및 클라우드 동기화 로직 적용 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -108,24 +142,23 @@
         window.resetData = resetData;
         window.downloadExcel = downloadExcel;
         window.toggleDinner = toggleDinner;
-        window.saveChanges = saveChanges; // 새로 추가된 저장 함수
+        window.saveChanges = saveChanges; 
 
         let rawSchedule = [];
         let dinnerState = {};
         let uniqueTeachers = [];
-        let hasUnsavedChanges = false; // 저장되지 않은 변경사항이 있는지 확인하는 변수
+        let hasUnsavedChanges = false; 
 
         // =========================================================================
         // [중요] 깃허브(GitHub) 배포 시 아래 영역에 선생님의 Firebase 설정을 넣어주세요!
         // =========================================================================
         const myFirebaseConfig = {
-  apiKey: "AIzaSyAHynq2ZeElY-eyIm3XrhIEAKpjospVBqI",
-  authDomain: "teacher-dinner-count-1st.firebaseapp.com",
-  projectId: "teacher-dinner-count-1st",
-  storageBucket: "teacher-dinner-count-1st.firebasestorage.app",
-  messagingSenderId: "418360271187",
-  appId: "1:418360271187:web:b3611daab61f32040501a6",
-  measurementId: "G-FR01QTLZE5"
+  apiKey: "AIzaSyDsp5MMHtEtouTN2KizWiqyxnZQflGZS0g",
+  authDomain: "teacher-dinner-count-1st-28d29.firebaseapp.com",
+  projectId: "teacher-dinner-count-1st-28d29",
+  storageBucket: "teacher-dinner-count-1st-28d29.firebasestorage.app",
+  messagingSenderId: "863171636322",
+  appId: "1:863171636322:web:21a333de4bd47a8b1b353b"
 }; 
         // =========================================================================
 
@@ -179,7 +212,6 @@
                     dinnerState = data.dinnerState || {};
                     uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
                     
-                    // 클라우드에서 새로운 데이터를 받았으므로 저장 버튼의 깜빡임 해제
                     hasUnsavedChanges = false;
                     document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
 
@@ -195,8 +227,9 @@
                 }
             }, (error) => {
                 console.error("동기화 에러:", error);
-                document.getElementById('checklistTitle').innerHTML = `⚠️ 설정 누락: Firestore 규칙`;
-                showToast("오류: Firebase 콘솔에서 Firestore 규칙을 테스트 모드로 설정했는지 확인해주세요.");
+                document.getElementById('checklistTitle').innerHTML = `⚠️ 권한 잠김: 모달 안내 참조`;
+                // 읽기 권한이 없을 때 모달 띄우기
+                document.getElementById('ruleErrorModal').classList.remove('hidden');
             });
         }
 
@@ -211,8 +244,9 @@
                 });
             } catch (error) {
                 console.error("Save error: ", error);
-                showToast("데이터 저장 실패: Firestore 규칙(권한)을 확인해주세요.");
-                throw error; // 에러를 던져서 saveChanges 함수에서 처리하도록 함
+                // 쓰기 권한이 없을 때 모달 띄우기
+                document.getElementById('ruleErrorModal').classList.remove('hidden');
+                throw error; // 여기서 에러를 발생시켜야 성공 메시지가 안 뜹니다.
             }
         }
 
@@ -225,14 +259,13 @@
 
             if (firebaseConfig) {
                 try {
-                    await saveDataToCloud();
+                    await saveDataToCloud(); // 저장이 완벽하게 성공할 때까지 기다립니다.
                     hasUnsavedChanges = false;
                     const saveBtn = document.getElementById('saveBtn');
-                    // 깜빡임(애니메이션) 효과 제거
                     saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
                     showToast("✅ 식사 기록이 클라우드에 성공적으로 저장되었습니다.");
                 } catch(e) {
-                    // 에러는 saveDataToCloud 내부에서 표시됨
+                    // 에러가 났을 때는 saveDataToCloud() 내부에서 모달창을 띄우므로 여기선 아무것도 안 함
                 }
             } else {
                 showToast("⚠️ DB 접속 코드가 없어 브라우저에만 임시로 남습니다.");
@@ -241,7 +274,6 @@
             }
         }
 
-        // --- 체크박스(버튼) 토글 (클라우드 저장 분리됨) ---
         function toggleDinner(date, teacher) {
             const key = `${date}_${teacher}`;
             dinnerState[key] = !dinnerState[key];
@@ -259,13 +291,11 @@
             
             updateStats();
             
-            // 데이터가 변경되었음을 표시하고 [저장하기] 버튼에 눈에 띄는 애니메이션 추가
             hasUnsavedChanges = true;
             const saveBtn = document.getElementById('saveBtn');
             saveBtn.classList.add('ring-4', 'ring-blue-300', 'animate-pulse');
         }
 
-        // --- UI 및 유틸리티 함수들 ---
         function showToast(message) {
             const toast = document.getElementById('toast');
             document.getElementById('toastMessage').textContent = message;
@@ -404,24 +434,26 @@
             });
         }
 
-        function resetData() {
+        async function resetData() {
             if(rawSchedule.length === 0) return;
             dinnerState = {};
             renderSchedule();
             updateStats();
             
-            // 초기화 버튼은 파급력이 크므로 즉시 클라우드에 덮어씌웁니다.
             if(firebaseConfig) {
-                saveDataToCloud();
-                showToast("식사 기록이 모두 초기화되었습니다. 다른 접속자들의 화면도 함께 초기화됩니다.");
-                hasUnsavedChanges = false;
-                document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                try {
+                    await saveDataToCloud();
+                    showToast("식사 기록이 모두 초기화되었습니다. 다른 접속자들의 화면도 함께 초기화됩니다.");
+                    hasUnsavedChanges = false;
+                    document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                } catch(e) {
+                    // 에러 시 모달창 뜸
+                }
             } else {
                 showToast("⚠️ 임시 데이터가 초기화되었습니다.");
             }
         }
 
-        // --- 파일 업로드 처리 ---
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -477,7 +509,8 @@
             reader.readAsArrayBuffer(file);
         }
 
-        function processImportedData(data) {
+        // 명단을 업로드하고 저장할 때 비동기(async) 처리로 변경하여 실패 시 가짜 메시지가 뜨지 않도록 개선
+        async function processImportedData(data) {
             if (!data || data.length < 2) {
                 showToast("데이터가 부족하거나 형식이 잘못되었습니다.");
                 return;
@@ -540,12 +573,16 @@
                 renderSchedule();
                 updateStats();
                 
-                // 새 명단 업로드 역시 파급력이 크므로 즉시 클라우드에 덮어씌웁니다.
                 if(firebaseConfig) {
-                    saveDataToCloud();
-                    showToast("새 명단이 클라우드에 성공적으로 등록되었습니다. 모든 사람에게 반영됩니다.");
-                    hasUnsavedChanges = false;
-                    document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                    try {
+                        // 저장이 완벽하게 완료된 후에만 성공 메시지 표시
+                        await saveDataToCloud();
+                        showToast("새 명단이 클라우드에 성공적으로 등록되었습니다. 모든 사람에게 반영됩니다.");
+                        hasUnsavedChanges = false;
+                        document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                    } catch(e) {
+                        // 에러가 나면 모달 창이 뜨므로 여기서 추가 작업 생략
+                    }
                 } else {
                     showToast("⚠️ 임시 명단이 등록되었습니다. (DB 연결 안됨)");
                 }
@@ -554,7 +591,6 @@
             }
         }
 
-        // --- 엑셀로 월간 통계 다운로드 ---
         function downloadExcel() {
             if (uniqueTeachers.length === 0) {
                 showToast("다운로드할 통계 데이터가 없습니다.");
