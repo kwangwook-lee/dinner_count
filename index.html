@@ -35,7 +35,6 @@
                     <label for="fileInput" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition duration-200 text-sm font-medium border border-blue-200 cursor-pointer inline-flex items-center shadow-sm">
                         <i class="fas fa-file-upload mr-1"></i> 새 명단 업로드
                     </label>
-                    <!-- 업로드 안내 툴팁 -->
                     <div class="absolute right-0 top-full mt-2 w-72 bg-gray-800 text-white text-xs rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                         CSV 및 엑셀 명단 파일을 올려주세요. 모든 접속자에게 즉시 반영됩니다.
                     </div>
@@ -50,7 +49,8 @@
             <!-- Left Column: Schedule & Checklist -->
             <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                    <h2 id="checklistTitle" class="text-lg font-bold text-gray-700">📅 대기 중</h2>
+                    <!-- 처음에 접속 시 '연결 중'이라는 문구를 띄웁니다 -->
+                    <h2 id="checklistTitle" class="text-lg font-bold text-gray-700">⏳ 클라우드 연결 중...</h2>
                     <span class="text-xs text-gray-500 bg-white px-2 py-1 rounded border">클릭하여 체크하세요</span>
                 </div>
                 <div class="overflow-x-auto">
@@ -73,7 +73,6 @@
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-fit">
                 <div class="p-5 border-b border-gray-100 bg-blue-50 flex justify-between items-center">
                     <h2 class="text-lg font-bold text-blue-800">📊 월간 식사 통계</h2>
-                    <!-- 엑셀 다운로드 버튼 -->
                     <button onclick="downloadExcel()" class="px-3 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-200 text-xs font-medium shadow-sm flex items-center">
                         <i class="fas fa-file-excel mr-1"></i> 엑셀 저장
                     </button>
@@ -101,13 +100,11 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // HTML의 onclick 등에서 직접 호출할 수 있도록 함수를 전역 객체(window)에 등록
         window.handleFileUpload = handleFileUpload;
         window.resetData = resetData;
         window.downloadExcel = downloadExcel;
         window.toggleDinner = toggleDinner;
 
-        // --- 실시간 연동을 위한 전역 변수 ---
         let rawSchedule = [];
         let dinnerState = {};
         let uniqueTeachers = [];
@@ -115,16 +112,6 @@
         // =========================================================================
         // [중요] 깃허브(GitHub) 배포 시 아래 영역에 선생님의 Firebase 설정을 넣어주세요!
         // =========================================================================
-        // Firebase 프로젝트를 만드신 후 발급받은 config 코드를 아래 null 대신 붙여넣어주세요.
-        // 예시: 
-        // const myFirebaseConfig = {
-        //     apiKey: "AIzaSyC...",
-        //     authDomain: "my-school-app.firebaseapp.com",
-        //     projectId: "my-school-app",
-        //     storageBucket: "my-school-app.appspot.com",
-        //     messagingSenderId: "1234567890",
-        //     appId: "1:1234567890:web:abcdef123456"
-        // };
         const myFirebaseConfig = {
   apiKey: "AIzaSyAHynq2ZeElY-eyIm3XrhIEAKpjospVBqI",
   authDomain: "teacher-dinner-count-1st.firebaseapp.com",
@@ -136,15 +123,11 @@
 }; 
         // =========================================================================
 
-        // 클라우드 접속 정보 (제미나이 환경 우선, 깃허브 등 외부일 경우 선생님의 설정 사용)
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : myFirebaseConfig;
-        
-        // 데이터베이스 문서 고유 경로용 ID
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'school-dinner-app-public';
         
         let app, auth, db, currentUser;
 
-        // 클라우드 초기화
         if (firebaseConfig) {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
@@ -167,15 +150,12 @@
                 }
             });
         } else {
-            // DB 접속 정보가 없을 경우(깃허브 배포 후 myFirebaseConfig를 넣지 않았을 때) 에러 메시지 표시
-            showToast("⚠️ 클라우드 설정이 없습니다. 깃허브 배포 시 Firebase 접속 코드를 넣어주세요. (새로고침 시 초기화됨)");
+            showToast("⚠️ 클라우드 설정이 없습니다. 깃허브 배포 시 Firebase 접속 코드를 넣어주세요.");
             renderEmptyState();
         }
 
-        // --- 클라우드에서 실시간으로 데이터 받아오기 ---
         function listenToData() {
             if (!currentUser || !db) return;
-            // 모두가 공통으로 바라보는 데이터베이스 문서 경로
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
             
             onSnapshot(docRef, (snapshot) => {
@@ -197,11 +177,11 @@
                 }
             }, (error) => {
                 console.error("동기화 에러:", error);
+                document.getElementById('checklistTitle').innerHTML = `⚠️ 클라우드 연결 오류`;
                 showToast("실시간 데이터를 불러오는 중 오류가 발생했습니다.");
             });
         }
 
-        // --- 변경된 데이터를 클라우드에 영구 저장하기 ---
         async function saveDataToCloud() {
             if (!currentUser || !db) return;
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
@@ -216,7 +196,6 @@
             }
         }
 
-        // --- UI 기본 함수들 ---
         function showToast(message) {
             const toast = document.getElementById('toast');
             document.getElementById('toastMessage').textContent = message;
@@ -254,8 +233,9 @@
         }
 
         function renderEmptyState() {
-            document.getElementById('checklistTitle').innerHTML = `📅 대기 중`;
-            document.getElementById('scheduleTable').innerHTML = `<tr><td colspan="3" class="p-10 text-center text-gray-500 font-medium">현재 클라우드에 등록된 명단이 없습니다.<br>담당자 선생님께서는 우측 상단의 <strong class="text-blue-500">새 명단 업로드</strong> 버튼을 눌러 파일을 올려주세요.</td></tr>`;
+            // 연결은 성공했으나 데이터가 없을 경우
+            document.getElementById('checklistTitle').innerHTML = `📅 명단 등록 대기 중`;
+            document.getElementById('scheduleTable').innerHTML = `<tr><td colspan="3" class="p-10 text-center text-gray-500 font-medium">현재 클라우드에 등록된 명단이 없습니다.<br>담당자 선생님께서는 우측 상단의 <strong class="text-blue-500">새 명단 업로드</strong> 버튼을 눌러 엑셀/CSV 파일을 올려주세요.</td></tr>`;
             document.getElementById('statsTable').innerHTML = `<tr><td colspan="2" class="p-6 text-center text-gray-400">명단을 업로드하면 통계가 표시됩니다.</td></tr>`;
         }
 
@@ -276,7 +256,6 @@
             const key = `${date}_${teacher}`;
             dinnerState[key] = !dinnerState[key];
             
-            // 시각적 업데이트 최적화
             const btn = document.getElementById(`btn_${key}`);
             if (dinnerState[key]) {
                 btn.classList.remove('bg-gray-100', 'text-gray-400', 'border-gray-200');
@@ -290,7 +269,6 @@
             
             updateStats();
             
-            // DB 접속 상태라면 데이터 전송
             if(firebaseConfig) {
                 saveDataToCloud();
             } else {
@@ -508,7 +486,7 @@
             if (newSchedule.length > 0) {
                 rawSchedule = newSchedule;
                 uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
-                dinnerState = {}; // 새 명단을 올리면 식사 상태 초기화
+                dinnerState = {}; 
                 
                 updateTitle();
                 renderSchedule();
