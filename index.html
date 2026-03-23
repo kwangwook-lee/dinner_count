@@ -32,15 +32,19 @@
             <div class="flex flex-wrap gap-2 items-center">
                 <div class="relative group">
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .pdf" class="hidden" onchange="handleFileUpload(event)">
-                    <label for="fileInput" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition duration-200 text-sm font-medium border border-blue-200 cursor-pointer inline-flex items-center shadow-sm">
-                        <i class="fas fa-file-upload mr-1"></i> 새 명단 업로드
+                    <label for="fileInput" class="px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition duration-200 text-sm font-medium border border-gray-200 cursor-pointer inline-flex items-center shadow-sm">
+                        <i class="fas fa-file-upload mr-1"></i> 새 명단
                     </label>
                     <div class="absolute right-0 top-full mt-2 w-72 bg-gray-800 text-white text-xs rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                         CSV 및 엑셀 명단 파일을 올려주세요. 모든 접속자에게 즉시 반영됩니다.
                     </div>
                 </div>
-                <button onclick="resetData()" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition duration-200 text-sm font-medium border border-red-200 shadow-sm">
-                    <i class="fas fa-rotate-right mr-1"></i> 체크 초기화
+                <button onclick="resetData()" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition duration-200 text-sm font-medium border border-red-200 shadow-sm">
+                    <i class="fas fa-rotate-right mr-1"></i> 초기화
+                </button>
+                <!-- 새로 추가된 저장하기 버튼 -->
+                <button onclick="saveChanges()" id="saveBtn" class="px-5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm font-bold shadow-md flex items-center">
+                    <i class="fas fa-save mr-1"></i> 저장하기
                 </button>
             </div>
         </header>
@@ -49,9 +53,8 @@
             <!-- Left Column: Schedule & Checklist -->
             <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                    <!-- 처음에 접속 시 '연결 중'이라는 문구를 띄웁니다 -->
                     <h2 id="checklistTitle" class="text-lg font-bold text-gray-700">⏳ 클라우드 연결 중...</h2>
-                    <span class="text-xs text-gray-500 bg-white px-2 py-1 rounded border">클릭하여 체크하세요</span>
+                    <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 font-medium">체크 후 우측 상단의 저장하기를 눌러주세요</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
@@ -100,14 +103,17 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // HTML 버튼에서 함수를 부를 수 있도록 등록
         window.handleFileUpload = handleFileUpload;
         window.resetData = resetData;
         window.downloadExcel = downloadExcel;
         window.toggleDinner = toggleDinner;
+        window.saveChanges = saveChanges; // 새로 추가된 저장 함수
 
         let rawSchedule = [];
         let dinnerState = {};
         let uniqueTeachers = [];
+        let hasUnsavedChanges = false; // 저장되지 않은 변경사항이 있는지 확인하는 변수
 
         // =========================================================================
         // [중요] 깃허브(GitHub) 배포 시 아래 영역에 선생님의 Firebase 설정을 넣어주세요!
@@ -134,14 +140,20 @@
             db = getFirestore(app);
 
             const initAuth = async () => {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("인증 에러:", error);
+                    document.getElementById('checklistTitle').innerHTML = `⚠️ 설정 누락: 익명 로그인`;
+                    showToast(`오류: Firebase 콘솔에서 [Authentication] -> [Sign-in method] -> [익명]을 사용 설정해주세요.`);
                 }
             };
             
-            initAuth().catch(console.error);
+            initAuth();
 
             onAuthStateChanged(auth, (user) => {
                 currentUser = user;
@@ -150,10 +162,12 @@
                 }
             });
         } else {
-            showToast("⚠️ 클라우드 설정이 없습니다. 깃허브 배포 시 Firebase 접속 코드를 넣어주세요.");
+            document.getElementById('checklistTitle').innerHTML = `⚠️ 설정 누락: Config 코드`;
+            showToast("⚠️ Firebase 접속 코드가 없습니다. 깃허브 코드 157줄 부근에 myFirebaseConfig를 입력해주세요.");
             renderEmptyState();
         }
 
+        // --- 클라우드 실시간 데이터 수신 ---
         function listenToData() {
             if (!currentUser || !db) return;
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
@@ -165,6 +179,10 @@
                     dinnerState = data.dinnerState || {};
                     uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
                     
+                    // 클라우드에서 새로운 데이터를 받았으므로 저장 버튼의 깜빡임 해제
+                    hasUnsavedChanges = false;
+                    document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+
                     if(rawSchedule.length === 0) {
                         renderEmptyState();
                     } else {
@@ -177,11 +195,12 @@
                 }
             }, (error) => {
                 console.error("동기화 에러:", error);
-                document.getElementById('checklistTitle').innerHTML = `⚠️ 클라우드 연결 오류`;
-                showToast("실시간 데이터를 불러오는 중 오류가 발생했습니다.");
+                document.getElementById('checklistTitle').innerHTML = `⚠️ 설정 누락: Firestore 규칙`;
+                showToast("오류: Firebase 콘솔에서 Firestore 규칙을 테스트 모드로 설정했는지 확인해주세요.");
             });
         }
 
+        // --- 클라우드에 데이터 저장하기 ---
         async function saveDataToCloud() {
             if (!currentUser || !db) return;
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
@@ -192,10 +211,61 @@
                 });
             } catch (error) {
                 console.error("Save error: ", error);
-                showToast("데이터 클라우드 저장에 실패했습니다.");
+                showToast("데이터 저장 실패: Firestore 규칙(권한)을 확인해주세요.");
+                throw error; // 에러를 던져서 saveChanges 함수에서 처리하도록 함
             }
         }
 
+        // --- 명시적 [저장하기] 버튼 클릭 시 동작하는 함수 ---
+        async function saveChanges() {
+            if (!hasUnsavedChanges) {
+                showToast("변경된 식사 체크 내용이 없습니다.");
+                return;
+            }
+
+            if (firebaseConfig) {
+                try {
+                    await saveDataToCloud();
+                    hasUnsavedChanges = false;
+                    const saveBtn = document.getElementById('saveBtn');
+                    // 깜빡임(애니메이션) 효과 제거
+                    saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                    showToast("✅ 식사 기록이 클라우드에 성공적으로 저장되었습니다.");
+                } catch(e) {
+                    // 에러는 saveDataToCloud 내부에서 표시됨
+                }
+            } else {
+                showToast("⚠️ DB 접속 코드가 없어 브라우저에만 임시로 남습니다.");
+                hasUnsavedChanges = false;
+                document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+            }
+        }
+
+        // --- 체크박스(버튼) 토글 (클라우드 저장 분리됨) ---
+        function toggleDinner(date, teacher) {
+            const key = `${date}_${teacher}`;
+            dinnerState[key] = !dinnerState[key];
+            
+            const btn = document.getElementById(`btn_${key}`);
+            if (dinnerState[key]) {
+                btn.classList.remove('bg-gray-100', 'text-gray-400', 'border-gray-200');
+                btn.classList.add('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-inner');
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i> 식사 완료';
+            } else {
+                btn.classList.add('bg-gray-100', 'text-gray-400', 'border-gray-200');
+                btn.classList.remove('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-inner');
+                btn.innerHTML = '<i class="fas fa-utensils mr-1"></i> 미확인';
+            }
+            
+            updateStats();
+            
+            // 데이터가 변경되었음을 표시하고 [저장하기] 버튼에 눈에 띄는 애니메이션 추가
+            hasUnsavedChanges = true;
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.classList.add('ring-4', 'ring-blue-300', 'animate-pulse');
+        }
+
+        // --- UI 및 유틸리티 함수들 ---
         function showToast(message) {
             const toast = document.getElementById('toast');
             document.getElementById('toastMessage').textContent = message;
@@ -204,7 +274,7 @@
             setTimeout(() => {
                 toast.classList.remove('translate-y-0', 'opacity-100');
                 toast.classList.add('-translate-y-20', 'opacity-0');
-            }, 3000);
+            }, 4000);
         }
 
         function formatDisplayDate(dateStr) {
@@ -233,7 +303,6 @@
         }
 
         function renderEmptyState() {
-            // 연결은 성공했으나 데이터가 없을 경우
             document.getElementById('checklistTitle').innerHTML = `📅 명단 등록 대기 중`;
             document.getElementById('scheduleTable').innerHTML = `<tr><td colspan="3" class="p-10 text-center text-gray-500 font-medium">현재 클라우드에 등록된 명단이 없습니다.<br>담당자 선생님께서는 우측 상단의 <strong class="text-blue-500">새 명단 업로드</strong> 버튼을 눌러 엑셀/CSV 파일을 올려주세요.</td></tr>`;
             document.getElementById('statsTable').innerHTML = `<tr><td colspan="2" class="p-6 text-center text-gray-400">명단을 업로드하면 통계가 표시됩니다.</td></tr>`;
@@ -249,30 +318,6 @@
                     monthText = firstDateText.split('/')[0] + '월';
                 }
                 document.getElementById('checklistTitle').innerHTML = `📅 ${monthText} 체크리스트`;
-            }
-        }
-
-        function toggleDinner(date, teacher) {
-            const key = `${date}_${teacher}`;
-            dinnerState[key] = !dinnerState[key];
-            
-            const btn = document.getElementById(`btn_${key}`);
-            if (dinnerState[key]) {
-                btn.classList.remove('bg-gray-100', 'text-gray-400', 'border-gray-200');
-                btn.classList.add('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-inner');
-                btn.innerHTML = '<i class="fas fa-check mr-1"></i> 식사 완료';
-            } else {
-                btn.classList.add('bg-gray-100', 'text-gray-400', 'border-gray-200');
-                btn.classList.remove('bg-blue-500', 'text-white', 'border-blue-600', 'shadow-inner');
-                btn.innerHTML = '<i class="fas fa-utensils mr-1"></i> 미확인';
-            }
-            
-            updateStats();
-            
-            if(firebaseConfig) {
-                saveDataToCloud();
-            } else {
-                showToast("⚠️ DB 설정이 없어 내역이 브라우저에만 임시로 남습니다.");
             }
         }
 
@@ -365,9 +410,12 @@
             renderSchedule();
             updateStats();
             
+            // 초기화 버튼은 파급력이 크므로 즉시 클라우드에 덮어씌웁니다.
             if(firebaseConfig) {
                 saveDataToCloud();
                 showToast("식사 기록이 모두 초기화되었습니다. 다른 접속자들의 화면도 함께 초기화됩니다.");
+                hasUnsavedChanges = false;
+                document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
             } else {
                 showToast("⚠️ 임시 데이터가 초기화되었습니다.");
             }
@@ -492,9 +540,12 @@
                 renderSchedule();
                 updateStats();
                 
+                // 새 명단 업로드 역시 파급력이 크므로 즉시 클라우드에 덮어씌웁니다.
                 if(firebaseConfig) {
                     saveDataToCloud();
                     showToast("새 명단이 클라우드에 성공적으로 등록되었습니다. 모든 사람에게 반영됩니다.");
+                    hasUnsavedChanges = false;
+                    document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
                 } else {
                     showToast("⚠️ 임시 명단이 등록되었습니다. (DB 연결 안됨)");
                 }
