@@ -22,7 +22,7 @@
         <span id="toastMessage">메시지</span>
     </div>
 
-    <!-- 🚨 Firestore 권한 에러 안내 모달 (새로 추가됨) 🚨 -->
+    <!-- 🚨 Firestore 권한 에러 안내 모달 -->
     <div id="ruleErrorModal" class="fixed inset-0 bg-black bg-opacity-60 z-[100] hidden flex items-center justify-center p-4">
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl max-w-2xl w-full border-t-8 border-red-500">
             <h2 class="text-2xl font-bold text-red-600 mb-4 flex items-center">
@@ -75,9 +75,6 @@
                         CSV 및 엑셀 명단 파일을 올려주세요. 모든 접속자에게 즉시 반영됩니다.
                     </div>
                 </div>
-                <button onclick="resetData()" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition duration-200 text-sm font-medium border border-red-200 shadow-sm">
-                    <i class="fas fa-rotate-right mr-1"></i> 초기화
-                </button>
                 <button onclick="saveChanges()" id="saveBtn" class="px-5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm font-bold shadow-md flex items-center">
                     <i class="fas fa-save mr-1"></i> 저장하기
                 </button>
@@ -139,7 +136,6 @@
 
         // HTML 버튼에서 함수를 부를 수 있도록 등록
         window.handleFileUpload = handleFileUpload;
-        window.resetData = resetData;
         window.downloadExcel = downloadExcel;
         window.toggleDinner = toggleDinner;
         window.saveChanges = saveChanges; 
@@ -150,16 +146,16 @@
         let hasUnsavedChanges = false; 
 
         // =========================================================================
-        // [중요] 깃허브(GitHub) 배포 시 아래 영역에 선생님의 Firebase 설정을 넣어주세요!
+        // [중요] 선생님의 고유 파이어베이스 접속 열쇠 (완벽 적용됨)
         // =========================================================================
         const myFirebaseConfig = {
-  apiKey: "AIzaSyDsp5MMHtEtouTN2KizWiqyxnZQflGZS0g",
-  authDomain: "teacher-dinner-count-1st-28d29.firebaseapp.com",
-  projectId: "teacher-dinner-count-1st-28d29",
-  storageBucket: "teacher-dinner-count-1st-28d29.firebasestorage.app",
-  messagingSenderId: "863171636322",
-  appId: "1:863171636322:web:21a333de4bd47a8b1b353b"
-}; 
+            apiKey: "AIzaSyDsp5MMHtEtouTN2KizWiqyxnZQflGZS0g",
+            authDomain: "teacher-dinner-count-1st-28d29.firebaseapp.com",
+            projectId: "teacher-dinner-count-1st-28d29",
+            storageBucket: "teacher-dinner-count-1st-28d29.firebasestorage.app",
+            messagingSenderId: "863171636322",
+            appId: "1:863171636322:web:21a333de4bd47a8b1b353b"
+        };
         // =========================================================================
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : myFirebaseConfig;
@@ -195,8 +191,6 @@
                 }
             });
         } else {
-            document.getElementById('checklistTitle').innerHTML = `⚠️ 설정 누락: Config 코드`;
-            showToast("⚠️ Firebase 접속 코드가 없습니다. 깃허브 코드 157줄 부근에 myFirebaseConfig를 입력해주세요.");
             renderEmptyState();
         }
 
@@ -235,7 +229,7 @@
 
         // --- 클라우드에 데이터 저장하기 ---
         async function saveDataToCloud() {
-            if (!currentUser || !db) return;
+            if (!db) return;
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
             try {
                 await setDoc(docRef, {
@@ -244,9 +238,8 @@
                 });
             } catch (error) {
                 console.error("Save error: ", error);
-                // 쓰기 권한이 없을 때 모달 띄우기
                 document.getElementById('ruleErrorModal').classList.remove('hidden');
-                throw error; // 여기서 에러를 발생시켜야 성공 메시지가 안 뜹니다.
+                throw error; 
             }
         }
 
@@ -259,13 +252,14 @@
 
             if (firebaseConfig) {
                 try {
-                    await saveDataToCloud(); // 저장이 완벽하게 성공할 때까지 기다립니다.
+                    await saveDataToCloud(); 
                     hasUnsavedChanges = false;
                     const saveBtn = document.getElementById('saveBtn');
                     saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
-                    showToast("✅ 식사 기록이 클라우드에 성공적으로 저장되었습니다.");
+                    
+                    showToast("저장을 완료했습니다.");
+                    alert("저장을 완료했습니다.");
                 } catch(e) {
-                    // 에러가 났을 때는 saveDataToCloud() 내부에서 모달창을 띄우므로 여기선 아무것도 안 함
                 }
             } else {
                 showToast("⚠️ DB 접속 코드가 없어 브라우저에만 임시로 남습니다.");
@@ -333,8 +327,28 @@
         }
 
         function renderEmptyState() {
-            document.getElementById('checklistTitle').innerHTML = `📅 명단 등록 대기 중`;
-            document.getElementById('scheduleTable').innerHTML = `<tr><td colspan="3" class="p-10 text-center text-gray-500 font-medium">현재 클라우드에 등록된 명단이 없습니다.<br>담당자 선생님께서는 우측 상단의 <strong class="text-blue-500">새 명단 업로드</strong> 버튼을 눌러 엑셀/CSV 파일을 올려주세요.</td></tr>`;
+            if (!firebaseConfig) {
+                document.getElementById('checklistTitle').innerHTML = `⚠️ 설정 누락 확인 필요`;
+                document.getElementById('scheduleTable').innerHTML = `
+                    <tr>
+                        <td colspan="3" class="p-10 text-center text-red-600 font-bold bg-red-50 border-y border-red-200">
+                            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i><br>
+                            Firebase 접속 코드(config)가 빠져 있습니다!<br>
+                            <span class="text-sm font-normal text-gray-700 mt-2 block">
+                                현재 상태로는 명단을 올리거나 체크를 해도 <strong>브라우저를 닫으면 데이터가 모두 날아갑니다.</strong><br>
+                                코드 162번째 줄에 선생님의 Firebase config를 넣고 깃허브에 다시 올려주세요.
+                            </span>
+                        </td>
+                    </tr>`;
+            } else {
+                document.getElementById('checklistTitle').innerHTML = `📅 명단 등록 대기 중`;
+                document.getElementById('scheduleTable').innerHTML = `
+                    <tr>
+                        <td colspan="3" class="p-10 text-center text-gray-500 font-medium">
+                            현재 클라우드에 등록된 명단이 없습니다.<br>담당자 선생님께서는 우측 상단의 <strong class="text-blue-500">새 명단</strong> 버튼을 눌러 엑셀 파일을 올려주세요.
+                        </td>
+                    </tr>`;
+            }
             document.getElementById('statsTable').innerHTML = `<tr><td colspan="2" class="p-6 text-center text-gray-400">명단을 업로드하면 통계가 표시됩니다.</td></tr>`;
         }
 
@@ -434,26 +448,6 @@
             });
         }
 
-        async function resetData() {
-            if(rawSchedule.length === 0) return;
-            dinnerState = {};
-            renderSchedule();
-            updateStats();
-            
-            if(firebaseConfig) {
-                try {
-                    await saveDataToCloud();
-                    showToast("식사 기록이 모두 초기화되었습니다. 다른 접속자들의 화면도 함께 초기화됩니다.");
-                    hasUnsavedChanges = false;
-                    document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
-                } catch(e) {
-                    // 에러 시 모달창 뜸
-                }
-            } else {
-                showToast("⚠️ 임시 데이터가 초기화되었습니다.");
-            }
-        }
-
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -509,7 +503,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // 명단을 업로드하고 저장할 때 비동기(async) 처리로 변경하여 실패 시 가짜 메시지가 뜨지 않도록 개선
         async function processImportedData(data) {
             if (!data || data.length < 2) {
                 showToast("데이터가 부족하거나 형식이 잘못되었습니다.");
@@ -575,13 +568,13 @@
                 
                 if(firebaseConfig) {
                     try {
-                        // 저장이 완벽하게 완료된 후에만 성공 메시지 표시
                         await saveDataToCloud();
-                        showToast("새 명단이 클라우드에 성공적으로 등록되었습니다. 모든 사람에게 반영됩니다.");
                         hasUnsavedChanges = false;
                         document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                        
+                        showToast("저장을 완료했습니다.");
+                        alert("저장을 완료했습니다.");
                     } catch(e) {
-                        // 에러가 나면 모달 창이 뜨므로 여기서 추가 작업 생략
                     }
                 } else {
                     showToast("⚠️ 임시 명단이 등록되었습니다. (DB 연결 안됨)");
