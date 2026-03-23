@@ -63,7 +63,7 @@
         <header class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-utensils text-blue-500 mr-2"></i>배정고 1학년 자율학습 식사 체크</h1>
-                <p class="text-gray-500 mt-1">당번 선생님 저녁 식사 여부 및 통계 대시보드 (클라우드 동기화 🟢)</p>
+                <p class="text-gray-500 mt-1">당번 선생님 저녁 식사 여부 및 통계 대시보드 <span class="font-bold text-blue-600">(v2.0 클라우드 최적화)</span></p>
             </div>
             <div class="flex flex-wrap gap-2 items-center">
                 <div class="relative group">
@@ -232,7 +232,7 @@
             if (!db) return;
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schoolData', 'main');
             try {
-                // 안전한 저장을 위해 데이터 정제 (Firebase는 undefined 값을 싫어하므로 방어막 추가)
+                // 안전한 저장을 위해 데이터 정제
                 const safeSchedule = JSON.parse(JSON.stringify(rawSchedule));
                 const safeDinnerState = JSON.parse(JSON.stringify(dinnerState));
 
@@ -251,28 +251,33 @@
 
         // --- 명시적 [저장하기] 버튼 클릭 시 동작하는 함수 ---
         async function saveChanges() {
-            if (!hasUnsavedChanges) {
-                showToast("변경된 식사 체크 내용이 없습니다.");
+            if (!firebaseConfig) {
+                alert("⚠️ 파이어베이스 설정 코드가 없어 저장이 불가능합니다.");
                 return;
             }
 
-            if (firebaseConfig) {
-                try {
-                    await saveDataToCloud(); 
-                    hasUnsavedChanges = false;
-                    const saveBtn = document.getElementById('saveBtn');
-                    saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
-                    
-                    // 저장이 100% 완료되었을 때만 팝업과 하단 토스트 메시지 띄우기
-                    showToast("저장을 완료했습니다.");
-                    alert("저장을 완료했습니다.");
-                } catch(e) {
-                    // 에러가 발생하면 팝업이 안 뜨고 saveDataToCloud() 내부의 경고창이 작동합니다.
-                }
-            } else {
-                showToast("⚠️ DB 접속 코드가 없어 브라우저에만 임시로 남습니다.");
+            // 시각적 피드백: 저장 버튼을 로딩 상태로 변경
+            const saveBtn = document.getElementById('saveBtn');
+            const originalHTML = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 저장 중...';
+            saveBtn.disabled = true;
+
+            try {
+                await saveDataToCloud(); 
+                
+                // 데이터베이스 저장 성공
                 hasUnsavedChanges = false;
-                document.getElementById('saveBtn').classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                
+                saveBtn.innerHTML = originalHTML;
+                saveBtn.disabled = false;
+                
+                showToast("저장을 완료했습니다.");
+                alert("✅ 저장을 완료했습니다!");
+            } catch(e) {
+                // 에러 발생 시 버튼 복구
+                saveBtn.innerHTML = originalHTML;
+                saveBtn.disabled = false;
             }
         }
 
@@ -519,4 +524,188 @@
 
             let newScheduleMap = new Map();
             for (let i = 0; i < data.length; i++) {
-                const row
+                const row = data[i];
+                if (!row || row.length === 0) continue;
+                const firstCell = String(row[0]).trim();
+
+                if (firstCell === '날짜') {
+                    const dates = row.slice(1);
+                    let teacherRows = [];
+                    let nextIdx = i + 1;
+                    while (nextIdx < data.length) {
+                        const nextRow = data[nextIdx];
+                        if (!nextRow || nextRow.length === 0) break;
+                        const nextFirstCell = String(nextRow[0]).trim();
+                        if (nextFirstCell.startsWith('감독교사')) {
+                            teacherRows.push(nextRow);
+                            nextIdx++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    for (let j = 0; j < dates.length; j++) {
+                        const dateVal = dates[j];
+                        if (!dateVal || String(dateVal).trim() === '') continue;
+                        const dateStr = String(dateVal).trim();
+                        let dailyTeachers = [];
+                        
+                        for (const tRow of teacherRows) {
+                            const tName = (tRow[j + 1]) ? String(tRow[j + 1]).trim() : '';
+                            if (tName) {
+                                dailyTeachers.push(...tName.split(',').map(t => t.trim()).filter(t => t));
+                            }
+                        }
+                        
+                        if (dailyTeachers.length > 0) {
+                            if (newScheduleMap.has(dateStr)) {
+                                newScheduleMap.get(dateStr).push(...dailyTeachers);
+                            } else {
+                                newScheduleMap.set(dateStr, dailyTeachers);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let newSchedule = Array.from(newScheduleMap, ([date, teachers]) => ({ date, teachers }));
+
+            if (newSchedule.length > 0) {
+                rawSchedule = newSchedule;
+                uniqueTeachers = [...new Set(rawSchedule.flatMap(day => day.teachers || []))].sort();
+                dinnerState = {}; 
+                
+                updateTitle();
+                renderSchedule();
+                updateStats();
+                
+                if(firebaseConfig) {
+                    try {
+                        const saveBtn = document.getElementById('saveBtn');
+                        const originalHTML = saveBtn.innerHTML;
+                        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 저장 중...';
+                        
+                        // 저장이 성공했을 때만 팝업이 뜹니다.
+                        await saveDataToCloud();
+                        hasUnsavedChanges = false;
+                        saveBtn.classList.remove('ring-4', 'ring-blue-300', 'animate-pulse');
+                        saveBtn.innerHTML = originalHTML;
+                        
+                        showToast("저장을 완료했습니다.");
+                        alert("✅ 명단 업로드 및 저장을 완료했습니다!");
+                    } catch(e) {
+                        // 저장이 실패하면 위에서 추가한 에러 경고창이 작동합니다.
+                        const saveBtn = document.getElementById('saveBtn');
+                        saveBtn.innerHTML = '<i class="fas fa-save mr-1"></i> 저장하기';
+                    }
+                } else {
+                    showToast("⚠️ 임시 명단이 등록되었습니다. (DB 연결 안됨)");
+                }
+            } else {
+                showToast("데이터를 읽지 못했습니다. 맨 앞칸이 '날짜', '감독교사1', '감독교사2'인 양식을 확인해주세요.");
+            }
+        }
+
+        function downloadExcel() {
+            if (uniqueTeachers.length === 0) {
+                showToast("다운로드할 통계 데이터가 없습니다.");
+                return;
+            }
+
+            let monthPrefix = "";
+            if (rawSchedule.length > 0) {
+                const firstDate = String(rawSchedule[0].date);
+                if (firstDate.includes('/')) {
+                    monthPrefix = firstDate.split('/')[0] + "월_";
+                } else if (firstDate.includes('월')) {
+                    monthPrefix = firstDate.split('월')[0].trim() + "월_";
+                }
+            }
+            const fileName = `${monthPrefix}자율학습_저녁식사_통계`;
+
+            const allDates = rawSchedule.map(day => day.date);
+            const excelDates = allDates.map(dateStr => formatExcelDate(dateStr));
+            const excelData = [];
+            
+            const titleRow = new Array(excelDates.length + 2).fill("");
+            titleRow[0] = fileName;
+            excelData.push(titleRow);
+
+            const headerRow = ["선생님 성함", ...excelDates, "합계"];
+            excelData.push(headerRow);
+
+            const stats = {};
+            uniqueTeachers.forEach(t => stats[t] = 0);
+            for (const key in dinnerState) {
+                if (dinnerState[key]) {
+                    const teacher = key.split('_')[1];
+                    if (stats[teacher] !== undefined) {
+                        stats[teacher]++;
+                    }
+                }
+            }
+
+            const sortedTeachers = uniqueTeachers.sort((a, b) => stats[b] - stats[a]);
+
+            sortedTeachers.forEach(teacher => {
+                const row = [teacher];
+                let total = 0;
+                allDates.forEach(date => {
+                    const key = `${date}_${teacher}`;
+                    if (dinnerState[key]) {
+                        row.push("O");
+                        total++;
+                    } else {
+                        row.push("");
+                    }
+                });
+                row.push(total);
+                excelData.push(row);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: headerRow.length - 1 } }];
+
+            const colWidths = [{ wch: 12 }]; 
+            excelDates.forEach(() => colWidths.push({ wch: 5 })); 
+            colWidths.push({ wch: 8 }); 
+            ws['!cols'] = colWidths;
+
+            const rowHeights = [{ hpt: 40 }, { hpt: 25 }]; 
+            sortedTeachers.forEach(() => rowHeights.push({ hpt: 22 })); 
+            ws['!rows'] = rowHeights;
+
+            ws['!pageSetup'] = { fitToPage: true, fitToWidth: 1, fitToHeight: 1, orientation: 'landscape' };
+
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
+
+                    const borderStyle = {
+                        top: { style: 'thin', color: { rgb: "000000" } },
+                        bottom: { style: 'thin', color: { rgb: "000000" } },
+                        left: { style: 'thin', color: { rgb: "000000" } },
+                        right: { style: 'thin', color: { rgb: "000000" } }
+                    };
+
+                    if (R === 0) {
+                        ws[cellRef].s = { font: { sz: 16, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
+                    } else if (R === 1) {
+                        ws[cellRef].s = { font: { bold: true, color: { rgb: "333333" } }, fill: { fgColor: { rgb: "F3F4F6" } }, alignment: { horizontal: "center", vertical: "center" }, border: borderStyle };
+                    } else {
+                        ws[cellRef].s = { alignment: { horizontal: "center", vertical: "center" }, border: borderStyle };
+                    }
+                }
+            }
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, fileName.substring(0, 31));
+            XLSX.writeFile(wb, `${fileName}.xlsx`);
+            showToast("엑셀 파일이 다운로드 되었습니다.");
+        }
+    </script>
+</body>
+</html>
